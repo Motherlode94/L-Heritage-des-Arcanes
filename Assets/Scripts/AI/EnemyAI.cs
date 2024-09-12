@@ -8,11 +8,12 @@ public class EnemyAI : MonoBehaviour
     public int health = 100;
     private Transform player;
     public bool followPlayer = true; // True pour suivre le joueur, false pour mouvement aléatoire
+    private GameManager gameManager; // Déclaration de la variable GameManager
 
     void Start()
     {
         player = GameObject.FindGameObjectWithTag("Player").transform;
-        gameManager = GameObject.Find("GameManager").GetComponent<GameManager>();
+        gameManager = GameObject.Find("GameManager").GetComponent<GameManager>(); // Initialisation de gameManager
     }
 
     void Update()
@@ -49,9 +50,19 @@ public class EnemyAI : MonoBehaviour
         }
     }
 
+    void ChargeAtPlayer()
+    {
+        Vector3 chargeDirection = (player.position - transform.position).normalized;
+        transform.position += chargeDirection * speed * Time.deltaTime;
+        Debug.Log("Enemy charging at player!");
+    }
+
     void Die()
     {
         Destroy(gameObject); // L'ennemi est détruit lorsqu'il n'a plus de points de vie
-        gameManager.EnemyKilled();
+        if (gameManager != null)
+        {
+            gameManager.EnemyKilled(); // Notifier GameManager que l'ennemi est mort
+        }
     }
 }
