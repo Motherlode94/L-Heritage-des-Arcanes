@@ -2,21 +2,27 @@ using UnityEngine;
 
 public class CameraTrigger : MonoBehaviour
 {
-    public Transform newCameraPosition;  // La nouvelle position/rotation de la caméra après avoir franchi la zone
-    public float transitionDuration = 1.5f;  // Durée de la transition de la caméra
+    public Transform newCameraPosition;  // Nouvelle position cible pour la caméra
+    public float transitionDuration = 1.5f;  // Durée de la transition
 
-    private ThirdPersonCamera cameraController;  // Référence au script de la caméra
+    private ThirdPersonCamera cameraController;
 
     void Start()
     {
-        cameraController = Camera.main.GetComponent<ThirdPersonCamera>();
+        // Trouver le script ThirdPersonCamera attaché à la caméra principale
+        cameraController = Camera.main?.GetComponent<ThirdPersonCamera>();
+        if (cameraController == null)
+        {
+            Debug.LogError("ThirdPersonCamera script not found on the Main Camera!");
+        }
     }
 
     void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player"))
+        // Si le joueur entre dans le trigger et que le script de caméra est présent
+        if (other.CompareTag("Player") && cameraController != null)
         {
-            // Appeler la méthode pour changer la position de la caméra
+            // Déclencher la transition de la caméra vers la nouvelle position
             cameraController.StartCameraTransition(newCameraPosition, transitionDuration);
         }
     }

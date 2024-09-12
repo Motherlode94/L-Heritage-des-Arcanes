@@ -4,11 +4,28 @@ using UnityEngine.InputSystem;
 public class PlayerCombat : MonoBehaviour
 {
     public int attackDamage = 20;
-    public float attackRange = 2f; // Portée d'attaque
-    public Transform attackPoint;
-    public LayerMask enemyLayers;
+    public float attackRange = 2f; // Range of attack
+    public Transform attackPoint;  // Where the attack is initiated
+    public LayerMask enemyLayers;  // Layer for detecting enemies
 
-    // Cette méthode est appelée lorsque l'input "Attack" est déclenché
+    private PlayerControls playerControls;
+
+    private void Awake()
+    {
+        playerControls = new PlayerControls(); // Initialize input controls
+    }
+
+    private void OnEnable()
+    {
+        playerControls.Player.Attack.performed += OnAttack;  // Register attack action
+        playerControls.Player.Attack.Enable();
+    }
+
+    private void OnDisable()
+    {
+        playerControls.Player.Attack.Disable();  // Disable attack action
+    }
+
     public void OnAttack(InputAction.CallbackContext context)
     {
         if (context.performed)
@@ -19,22 +36,26 @@ public class PlayerCombat : MonoBehaviour
 
     void Attack()
     {
-        // Détection des ennemis dans la zone d'attaque (sphère)
+        // Detect enemies within range of the attack
         Collider[] hitEnemies = Physics.OverlapSphere(attackPoint.position, attackRange, enemyLayers);
 
+        // Apply damage to enemies
         foreach (Collider enemy in hitEnemies)
         {
-            enemy.GetComponent<EnemyAI>().TakeDamage(attackDamage);
+            EnemyAI enemyAI = enemy.GetComponent<EnemyAI>();
+            if (enemyAI != null)
+            {
+                enemyAI.TakeDamage(attackDamage);
+            }
         }
     }
 
     void OnDrawGizmosSelected()
     {
-        // Visualisation de la portée d'attaque
         if (attackPoint == null)
             return;
 
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(attackPoint.position, attackRange);
+        Gizmos.DrawWireSphere(attackPoint.position, attackRange);  // Visualize attack range
     }
 }

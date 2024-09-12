@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,25 +6,19 @@ public class PlayerStats : MonoBehaviour
     public float speed = 5f;
     public int health = 100;
     public int attackPower = 10;
+    public int skillPoints = 0; // Skill points available for upgrades
 
-    // Points de compétence du joueur
-    public int skillPoints = 0;
+    private PlayerControls playerControls;
+    private InputAction upgradeAction;
 
-    private PlayerControls playerControls; // Classe générée pour les actions d'input
-    private InputAction upgradeAction; // Action "Upgrade"
-
-    void Awake()
+    private void Awake()
     {
-        // Initialiser le système d'Input via PlayerControls
         playerControls = new PlayerControls();
+        upgradeAction = playerControls.Player.Upgrade; // Find the "Upgrade" action in the Player input map
 
-        // Utiliser FindAction pour trouver l'action par son nom dans l'Input Map "Player"
-        upgradeAction = playerControls.FindAction("Upgrade");
-
-        // Vérifier si l'action est trouvée et s'abonner à l'événement
         if (upgradeAction != null)
         {
-            upgradeAction.performed += ctx => Upgrade();
+            upgradeAction.performed += ctx => Upgrade(); // Subscribe to the upgrade action
         }
         else
         {
@@ -34,23 +26,23 @@ public class PlayerStats : MonoBehaviour
         }
     }
 
-    void OnEnable()
+    private void OnEnable()
     {
-        playerControls.Enable(); // Activer les inputs
+        playerControls.Enable(); // Enable input actions
     }
 
-    void OnDisable()
+    private void OnDisable()
     {
-        playerControls.Disable(); // Désactiver les inputs quand l'objet est désactivé
+        playerControls.Disable(); // Disable input actions
     }
 
     void Upgrade()
     {
-        // Vérifier si des points de compétence sont disponibles
+        // Check if there are enough skill points to upgrade
         if (skillPoints > 0)
         {
-            UpgradeSpeed(1f); // Augmente la vitesse
-            skillPoints--; // Dépense des points de compétence
+            UpgradeSpeed(1f); // Example: Increase speed by 1
+            skillPoints--; // Reduce available skill points
             Debug.Log("Speed upgraded. Remaining skill points: " + skillPoints);
         }
         else
@@ -59,25 +51,46 @@ public class PlayerStats : MonoBehaviour
         }
     }
 
-    // Méthodes pour améliorer les statistiques du joueur
+    // Methods to upgrade different player stats
     public void UpgradeSpeed(float amount)
     {
         speed += amount;
+        Debug.Log("Speed upgraded by: " + amount);
     }
 
     public void UpgradeHealth(int amount)
     {
         health += amount;
+        Debug.Log("Health upgraded by: " + amount);
     }
 
     public void UpgradeAttack(int amount)
     {
         attackPower += amount;
+        Debug.Log("Attack power upgraded by: " + amount);
     }
 
-    // Méthode pour gagner des points de compétence
+    // Method to gain skill points
     public void EarnSkillPoints(int points)
     {
         skillPoints += points;
+        Debug.Log("Gained skill points: " + points);
+    }
+
+    // Method to take damage (used by enemies or environmental hazards)
+    public void TakeDamage(int damage)
+    {
+        health -= damage;
+        if (health <= 0)
+        {
+            Die(); // Handle player death
+        }
+    }
+
+    private void Die()
+    {
+        // Placeholder death handling
+        Debug.Log("Player died!");
+        // Add further death logic here, like triggering a respawn or game over.
     }
 }
