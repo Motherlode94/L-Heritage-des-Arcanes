@@ -1,3 +1,4 @@
+using System.Collections; // Import System.Collections for IEnumerator
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -17,7 +18,6 @@ public class ThirdPersonCamera : MonoBehaviour
     private float currentYaw = 0f;
     private float currentPitch = 0f;
     private PlayerControls playerControls;
-
 
     // Method to start camera transition
     public void StartCameraTransition(Transform newTargetPosition, float duration)

@@ -29,6 +29,7 @@ public class PlayerMovement : MonoBehaviour
     {
         playerControls = new PlayerControls();
         playerControls.Player.Move.performed += ctx => movementInput = ctx.ReadValue<Vector2>();
+        playerControls.Player.Move.canceled += ctx => movementInput = Vector2.zero; // Ajout pour arrêter le mouvement
         playerControls.Player.Jump.performed += ctx => jumpInput = true;
         playerControls.Player.Crouch.performed += ctx => crouchInput = ctx.ReadValueAsButton();
         playerControls.Player.Sprint.performed += ctx => sprintInput = ctx.ReadValueAsButton();
@@ -66,6 +67,7 @@ public class PlayerMovement : MonoBehaviour
         // Handle jumping if grounded
         if (isGrounded && jumpInput)
         {
+            rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z); // Réinitialise la vitesse verticale avant de sauter
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
             jumpInput = false;
         }

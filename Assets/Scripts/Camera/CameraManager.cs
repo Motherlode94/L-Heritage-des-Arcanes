@@ -3,111 +3,178 @@ using UnityEngine.InputSystem;
 
 public class CameraManager : MonoBehaviour
 {
-    public Transform firstPersonTarget;  // Position et rotation cible pour la caméra First Person
-    public Transform thirdPersonTarget;  // Position et rotation cible pour la caméra Third Person
-    public Transform topDownTarget;      // Position et rotation cible pour la vue d'aigle
+    public Transform thirdPersonTarget;
+    public Transform firstPersonTarget;
+    public Transform topDownTarget;
 
-    public Camera mainCamera;            // La caméra principale qui va effectuer les transitions
-    public float transitionDuration = 1.5f; // Durée de la transition en secondes
+    public Camera mainCamera;
+    public float smoothSpeed = 0.1f;
+    public float baseHeadMovementSpeed = 50f;
+    public float headRotationLimit = 60f;
+    public float transitionDuration = 1.5f;
 
-    private bool isTransitioning = false;
+    public float minRotationSpeed = 20f;  // Vitesse minimale de rotation quand le joueur est immobile
+    public float maxRotationSpeed = 100f; // Vitesse maximale de rotation quand le joueur court
+
+    private Vector2 lookInput;
     private Transform currentTarget;
     private float transitionProgress;
+    private bool isTransitioning = false;
+    private PlayerControls playerControls;
+    private bool isHeadTurning = false;
 
-    private PlayerControls playerControls; // Système d'input
+    private Quaternion targetRotation;
+    public float rotationSmoothTime = 0.1f;
+    private Quaternion currentRotationVelocity;
+
+    private CharacterController playerController;  // Référence au contrôleur du joueur
+    private float currentSpeed;  // Vitesse actuelle du joueur
+
+    // Ajouter une variable pour la vitesse maximale du joueur
+    public float maxPlayerSpeed = 10f; // Ex. Vitesse maximale définie par vos scripts de mouvement
 
     private void Awake()
     {
-        playerControls = new PlayerControls(); // Initialiser les contrôles
-
-        // Relier l'action SwitchCameraView à la fonction OnSwitchCameraView
+        playerControls = new PlayerControls();
         playerControls.Player.SwitchCameraView.performed += OnSwitchCameraView;
+        playerControls.Player.Look.performed += ctx => lookInput = ctx.ReadValue<Vector2>(); 
+        playerControls.Player.Look.canceled += ctx => isHeadTurning = false;
+
+        playerController = FindObjectOfType<CharacterController>(); // Récupérer le CharacterController du joueur
     }
 
     private void OnEnable()
     {
-        playerControls.Enable(); // Activer les inputs
+        playerControls.Enable();
     }
 
     private void OnDisable()
     {
-        playerControls.Disable(); // Désactiver les inputs
+        playerControls.Disable();
     }
 
     private void Start()
     {
-        // Par défaut, activer la vue à la troisième personne
         SetThirdPersonView();
-    }
-
-    // Fonction déclenchée lorsque la touche pour changer la vue de la caméra est appuyée
-    private void OnSwitchCameraView(InputAction.CallbackContext context)
-    {
-        if (context.performed && !isTransitioning)
-        {
-            // Alterner entre les vues de caméra
-            if (currentTarget == firstPersonTarget)
-            {
-                SetThirdPersonView();
-            }
-            else if (currentTarget == thirdPersonTarget)
-            {
-                SetTopDownView();
-            }
-            else if (currentTarget == topDownTarget)
-            {
-                SetFirstPersonView();
-            }
-        }
-    }
-
-    // Définir la vue à la première personne
-    private void SetFirstPersonView()
-    {
-        StartTransition(firstPersonTarget);
-    }
-
-    // Définir la vue à la troisième personne
-    private void SetThirdPersonView()
-    {
-        StartTransition(thirdPersonTarget);
-    }
-
-    // Définir la vue en hauteur (vue d'aigle)
-    private void SetTopDownView()
-    {
-        StartTransition(topDownTarget);
-    }
-
-    // Démarrer la transition vers une nouvelle cible de caméra
-    private void StartTransition(Transform newTarget)
-    {
-        currentTarget = newTarget; // Changer la cible de la caméra
-        transitionProgress = 0f;   // Réinitialiser la progression de la transition
-        isTransitioning = true;    // Marquer que la transition est en cours
+        targetRotation = mainCamera.transform.rotation;
     }
 
     private void Update()
     {
         if (isTransitioning)
         {
-            PerformTransition(); // Effectuer la transition de caméra
+            PerformTransition();
+        }
+        else
+        {
+            UpdatePlayerSpeed();  // Met à jour la vitesse actuelle du joueur
+            if (currentTarget == thirdPersonTarget)
+            {
+                HandleHeadMovement();
+            }
+
+            FollowPlayer();
         }
     }
 
-    // Effectuer la transition entre la position actuelle et la nouvelle cible
+    private void OnSwitchCameraView(InputAction.CallbackContext context)
+    {
+        if (!isTransitioning)
+        {
+            if (currentTarget == thirdPersonTarget)
+            {
+                SetFirstPersonView();
+            }
+            else if (currentTarget == firstPersonTarget)
+            {
+                SetTopDownView();
+            }
+            else if (currentTarget == topDownTarget)
+            {
+                SetThirdPersonView();
+            }
+        }
+    }
+
+    private void SetFirstPersonView()
+    {
+        StartTransition(firstPersonTarget);
+    }
+
+    private void SetThirdPersonView()
+    {
+        StartTransition(thirdPersonTarget);
+    }
+
+    private void SetTopDownView()
+    {
+        StartTransition(topDownTarget);
+    }
+
+    private void StartTransition(Transform newTarget)
+    {
+        currentTarget = newTarget;
+        transitionProgress = 0f;
+        isTransitioning = true;
+    }
+
     private void PerformTransition()
     {
         transitionProgress += Time.deltaTime / transitionDuration;
 
-        // Interpolation de la position et de la rotation de la caméra
         mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, currentTarget.position, transitionProgress);
         mainCamera.transform.rotation = Quaternion.Slerp(mainCamera.transform.rotation, currentTarget.rotation, transitionProgress);
 
-        // Lorsque la transition est terminée
         if (transitionProgress >= 1f)
         {
-            isTransitioning = false; // Fin de la transition
+            isTransitioning = false;
         }
+    }
+
+    private void FollowPlayer()
+    {
+        if (currentTarget == thirdPersonTarget)
+        {
+            Vector3 desiredPosition = thirdPersonTarget.position;
+            Vector3 smoothedPosition = Vector3.Lerp(mainCamera.transform.position, desiredPosition, smoothSpeed);
+            mainCamera.transform.position = smoothedPosition;
+
+            mainCamera.transform.LookAt(thirdPersonTarget.position + Vector3.up * 1.5f);
+        }
+    }
+
+    // Mettre à jour la vitesse actuelle du joueur
+    private void UpdatePlayerSpeed()
+    {
+        if (playerController != null)
+        {
+            currentSpeed = playerController.velocity.magnitude;  // Obtenir la vitesse actuelle du joueur
+        }
+    }
+
+    // Appliquer le mouvement de tête avec une inertie ajustée en fonction de la vitesse du joueur
+    private void HandleHeadMovement()
+    {
+        if (lookInput != Vector2.zero) // Si on reçoit une entrée
+        {
+            isHeadTurning = true;
+
+            // Ajuster la vitesse de rotation en fonction de la vitesse du joueur
+            float adjustedHeadMovementSpeed = Mathf.Lerp(minRotationSpeed, maxRotationSpeed, currentSpeed / maxPlayerSpeed);
+
+            // Rotation horizontale (yaw) et verticale (pitch)
+            float yawRotation = lookInput.x * adjustedHeadMovementSpeed * Time.deltaTime;
+            float pitchRotation = lookInput.y * adjustedHeadMovementSpeed * Time.deltaTime;
+
+            // Calcul des nouvelles rotations
+            float currentYaw = Mathf.Clamp(mainCamera.transform.eulerAngles.y + yawRotation, -headRotationLimit, headRotationLimit);
+            float currentPitch = Mathf.Clamp(mainCamera.transform.eulerAngles.x - pitchRotation, -headRotationLimit, headRotationLimit);
+
+            // Définir la rotation cible avec limitation
+            targetRotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
+        }
+
+        // Appliquer l'inertie de la rotation avec Quaternion.Slerp
+        mainCamera.transform.rotation = Quaternion.Slerp(mainCamera.transform.rotation, targetRotation, rotationSmoothTime);
     }
 }
