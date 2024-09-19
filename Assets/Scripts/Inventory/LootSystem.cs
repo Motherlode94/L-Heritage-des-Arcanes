@@ -1,16 +1,29 @@
 using UnityEngine;
 
+[System.Serializable]
+public class LootItem
+{
+    public GameObject item;
+    public float dropChance;  // Chance individuelle de cet objet
+}
+
 public class LootSystem : MonoBehaviour
 {
-    public GameObject[] lootItems; // Liste des objets à looter
-    public float dropChance = 0.5f; // Chance de loot (50%)
+    public LootItem[] lootItems;
 
     public void DropLoot()
     {
-        if (Random.value <= dropChance)
+        float randomValue = Random.value;
+        float cumulativeChance = 0f;
+
+        foreach (LootItem lootItem in lootItems)
         {
-            int randomIndex = Random.Range(0, lootItems.Length);
-            Instantiate(lootItems[randomIndex], transform.position, Quaternion.identity);
+            cumulativeChance += lootItem.dropChance;
+            if (randomValue <= cumulativeChance)
+            {
+                Instantiate(lootItem.item, transform.position, Quaternion.identity);
+                break;
+            }
         }
     }
 }

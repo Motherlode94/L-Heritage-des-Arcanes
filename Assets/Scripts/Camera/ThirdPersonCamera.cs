@@ -1,6 +1,6 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 using System.Collections;
+using UnityEngine.InputSystem;
 
 public class ThirdPersonCamera : MonoBehaviour
 {
@@ -20,14 +20,14 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void Awake()
     {
-        playerControls = new PlayerControls(); // Initialiser les contrôles d'entrée
+        playerControls = new PlayerControls();  // Initialize input controls
     }
 
     private void OnEnable()
     {
-        playerControls.Player.Look.performed += OnLook;  // Associer l'action de rotation de la caméra
-        playerControls.Player.Look.canceled += OnLookCanceled;  // Réinitialiser l'entrée de rotation
-        playerControls.Player.Zoom.performed += OnZoom;  // Associer l'action de zoom
+        playerControls.Player.Look.performed += OnLook;
+        playerControls.Player.Look.canceled += OnLookCanceled;
+        playerControls.Player.Zoom.performed += OnZoom;
         playerControls.Player.Enable();
     }
 
@@ -68,7 +68,7 @@ public class ThirdPersonCamera : MonoBehaviour
     {
         currentYaw += rotationInput.x * rotationSpeed * Time.deltaTime;
         currentPitch -= rotationInput.y * rotationSpeed * Time.deltaTime;
-        currentPitch = Mathf.Clamp(currentPitch, -30f, 60f);  // Limiter l'angle vertical
+        currentPitch = Mathf.Clamp(currentPitch, -30f, 60f);  // Limit vertical angle
     }
 
     private void UpdateCameraPosition()
@@ -80,7 +80,7 @@ public class ThirdPersonCamera : MonoBehaviour
         transform.LookAt(player.position + Vector3.up * 2f);
     }
 
-    // Méthode pour démarrer la transition de la caméra
+    // Method to start the camera transition
     public void StartCameraTransition(Transform newTargetPosition, float duration)
     {
         StartCoroutine(CameraTransition(newTargetPosition, duration));
@@ -100,7 +100,7 @@ public class ThirdPersonCamera : MonoBehaviour
             yield return null;
         }
 
-        // Fixer la position et la rotation finales
+        // Ensure the camera reaches the final position and rotation
         transform.position = newTargetPosition.position;
         transform.rotation = newTargetPosition.rotation;
     }

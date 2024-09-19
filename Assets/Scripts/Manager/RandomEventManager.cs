@@ -19,17 +19,32 @@ public class RandomEventManager : MonoBehaviour
 
     void TriggerRandomEvent()
     {
-        int eventType = Random.Range(0, 2);
+        int eventType = Random.Range(0, 3); // Augmentation du nombre d'événements potentiels
 
-        if (eventType == 0)
+        switch (eventType)
         {
-            Debug.Log("Storm event triggered!");
-            // Code pour activer une tempête
+            case 0:
+                TriggerStormEvent();
+                break;
+            case 1:
+                TriggerBossEvent();
+                break;
+            default:
+                Debug.Log("No event triggered this time.");
+                break;
         }
-        else if (eventType == 1)
-        {
-            Debug.Log("Boss event triggered!");
-            Instantiate(bossEnemy, new Vector3(0, 0, 0), Quaternion.identity);
-        }
+    }
+
+    void TriggerStormEvent()
+    {
+        Debug.Log("Storm event triggered!");
+        // Code pour activer une tempête, par exemple : changement de météo, dégâts aléatoires
+    }
+
+    void TriggerBossEvent()
+    {
+        Debug.Log("Boss event triggered!");
+        Vector3 randomPosition = new Vector3(Random.Range(-10, 10), 0, Random.Range(-10, 10));
+        Instantiate(bossEnemy, randomPosition, Quaternion.identity); // Spawn à une position aléatoire
     }
 }

@@ -30,10 +30,15 @@ public class ScoreManager : MonoBehaviour
     {
         comboMultiplier++;
         comboTimer = comboResetTime; // Reset timer for combo
+        // Vous pouvez ajouter un effet visuel ici (ex : afficher le multiplicateur à l'écran)
     }
 
     public void ResetCombo()
     {
         comboMultiplier = 1;
+        Debug.Log("Combo reset.");
     }
+
+    // Vous pouvez aussi ajouter un système de rétroaction sonore ici
+    // public AudioSource comboSound; -> Jouez un son lors de l'augmentation du combo
 }

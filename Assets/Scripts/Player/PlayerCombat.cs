@@ -1,34 +1,38 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 public class PlayerCombat : MonoBehaviour
 {
     public int attackDamage = 20;
-    public float attackRange = 2f; // Range of attack
-    public Transform attackPoint;  // Where the attack is initiated
-    public LayerMask enemyLayers;  // Layer for detecting enemies
+    public float attackRange = 2f; 
+    public Transform attackPoint;  
+    public LayerMask enemyLayers;  
+    public float attackCooldown = 1f;  
+    public Animator animator; // Utilisé pour les animations
 
     private PlayerControls playerControls;
+    private bool canAttack = true;
 
     private void Awake()
     {
-        playerControls = new PlayerControls(); // Initialize input controls
+        playerControls = new PlayerControls();
     }
 
     private void OnEnable()
     {
-        playerControls.Player.Attack.performed += OnAttack;  // Register attack action
-        playerControls.Player.Attack.Enable();
+        playerControls.Player.Attack.performed += OnAttack;  
+        playerControls.Player.Enable();
     }
 
     private void OnDisable()
     {
-        playerControls.Player.Attack.Disable();  // Disable attack action
+        playerControls.Player.Disable();
     }
 
     public void OnAttack(InputAction.CallbackContext context)
     {
-        if (context.performed)
+        if (context.performed && canAttack)
         {
             Attack();
         }
@@ -36,26 +40,40 @@ public class PlayerCombat : MonoBehaviour
 
     void Attack()
     {
-        // Detect enemies within range of the attack
+        // Jouer l'animation d'attaque
+        if (animator != null)
+        {
+            animator.SetTrigger("Attack");  // Jouer l'animation d'attaque
+        }
+
+        // Gestion du cooldown de l'attaque
+        StartCoroutine(AttackCooldown());
+
+        // Détection des ennemis dans la portée de l'attaque
         Collider[] hitEnemies = Physics.OverlapSphere(attackPoint.position, attackRange, enemyLayers);
 
-        // Apply damage to enemies
         foreach (Collider enemy in hitEnemies)
         {
             EnemyAI enemyAI = enemy.GetComponent<EnemyAI>();
             if (enemyAI != null)
             {
-                enemyAI.TakeDamage(attackDamage);
+                enemyAI.TakeDamage(attackDamage);  // Appliquer les dégâts
             }
         }
     }
 
+    private IEnumerator AttackCooldown()
+    {
+        canAttack = false;
+        yield return new WaitForSeconds(attackCooldown);
+        canAttack = true;
+    }
+
     void OnDrawGizmosSelected()
     {
-        if (attackPoint == null)
-            return;
+        if (attackPoint == null) return;
 
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(attackPoint.position, attackRange);  // Visualize attack range
+        Gizmos.DrawWireSphere(attackPoint.position, attackRange);  // Visualiser la portée de l'attaque
     }
 }

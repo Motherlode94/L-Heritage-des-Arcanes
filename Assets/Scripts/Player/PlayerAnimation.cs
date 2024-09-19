@@ -20,6 +20,7 @@ public class PlayerAnimation : MonoBehaviour
     public float crouchSpeed = 1.5f;
     public float sprintSpeed = 5f;
     public float mouseSensitivity = 100f;
+    public float rotationSmoothTime = 0.1f;
     private float xRotation = 0f;
 
     private CharacterController characterController;
@@ -62,60 +63,67 @@ public class PlayerAnimation : MonoBehaviour
         HandleMouseLook();
         HandleAnimations();
         HandleCrouch();
+        AlignBodyToCamera();
     }
 
     void HandleMovement()
     {
-    
-    Vector3 move = transform.right * movementInput.x + transform.forward * movementInput.y;
+        Vector3 move = transform.right * movementInput.x + transform.forward * movementInput.y;
 
-    if (sprintInput && movementInput.y > 0 && !isCrouching)
-    {
-        isSprinting = true;
-        characterController.Move(move * sprintSpeed * Time.deltaTime);
-    }
-    else if (crouchInput)
-    {
-        isCrouching = true;
-        characterController.Move(move * crouchSpeed * Time.deltaTime);
-    }
-    else
-    {
-        isSprinting = false;
-        isCrouching = false;
-        characterController.Move(move * walkSpeed * Time.deltaTime);
+        if (sprintInput && movementInput.y > 0 && !isCrouching)
+        {
+            isSprinting = true;
+            characterController.Move(move * sprintSpeed * Time.deltaTime);
+        }
+        else if (isCrouching)
+        {
+            if (movementInput.magnitude > 0)
+            {
+                animator.SetBool("CrouchMoving", true);  // Utiliser le blend tree pour les mouvements accroupis
+            }
+            characterController.Move(move * crouchSpeed * Time.deltaTime);
+        }
+        else
+        {
+            isSprinting = false;
+            characterController.Move(move * walkSpeed * Time.deltaTime);
+        }
+
+        isWalkingFW = (movementInput.y > 0);
+        isWalkingBW = (movementInput.y < 0);
+
+        HandleJumpAndFall();
     }
 
-    isWalkingFW = (movementInput.y > 0);
-    isWalkingBW = (movementInput.y < 0);
-
-    // Gestion du saut, de la chute, et de l'atterrissage
-    if (jumpInput && characterController.isGrounded)
+    void HandleJumpAndFall()
     {
-        isJumping = true;
-        isFalling = false;
-        isLanding = false;
+        // Gestion du saut, de la chute, et de l'atterrissage
+        if (jumpInput && characterController.isGrounded && !isJumping)
+        {
+            isJumping = true;
+            isFalling = false;
+            isLanding = false;
 
-        animator.SetBool("isJumping", true);
-        animator.SetBool("isFalling", false);
-        animator.ResetTrigger("isLanding");
+            animator.SetBool("isJumping", true);
+            animator.SetBool("isFalling", false);
+            animator.ResetTrigger("isLanding");
 
-        jumpInput = false;
-    }
-    else if (!characterController.isGrounded && !isJumping)
-    {
-        isFalling = true;
-        animator.SetBool("isFalling", true);
-        animator.SetBool("isJumping", false);
-    }
-    else if (characterController.isGrounded && isFalling)
-    {
-        isFalling = false;
-        isLanding = true;
+            jumpInput = false;
+        }
+        else if (!characterController.isGrounded && !isJumping)
+        {
+            isFalling = true;
+            animator.SetBool("isFalling", true);
+            animator.SetBool("isJumping", false);
+        }
+        else if (characterController.isGrounded && isFalling)
+        {
+            isFalling = false;
+            isLanding = true;
 
-        animator.SetTrigger("isLanding");  // Déclencher l'animation d'atterrissage
-        animator.SetBool("isFalling", false);
-    }
+            animator.SetTrigger("isLanding");  // Déclencher l'animation d'atterrissage
+            animator.SetBool("isFalling", false);
+        }
     }
 
     void HandleMouseLook()
@@ -130,9 +138,19 @@ public class PlayerAnimation : MonoBehaviour
         playerBody.Rotate(Vector3.up * mouseX);
     }
 
+    void AlignBodyToCamera()
+    {
+        // On ne tourne que le corps, pas la caméra
+        Vector3 cameraForward = playerCamera.forward;
+        cameraForward.y = 0;  // Éviter que le joueur se penche ou se lève
+
+        Quaternion targetRotation = Quaternion.LookRotation(cameraForward);
+        playerBody.rotation = Quaternion.Slerp(playerBody.rotation, targetRotation, Time.deltaTime * rotationSmoothTime);
+    }
+
     void HandleAnimations()
     {
-        // Gestion des animations d'accroupissement via blend tree
+        // Gestion des animations accroupies via blend tree
         if (isCrouching)
         {
             animator.SetFloat("Horizontal", movementInput.x);
@@ -144,8 +162,7 @@ public class PlayerAnimation : MonoBehaviour
             }
             else
             {
-                // Crouch blend tree handle
-                animator.SetBool("CrouchMoving", true);
+                animator.SetBool("CrouchMoving", true);  // Le BlendTree gère les mouvements
             }
         }
         else
@@ -161,16 +178,24 @@ public class PlayerAnimation : MonoBehaviour
 
     void HandleCrouch()
     {
-        if (crouchInput && !isCrouching) // Si on commence à s'accroupir
+        if (crouchInput && !isCrouching)
         {
             isCrouching = true;
-            animator.SetBool("IsCrouching", true); // Active l'animation CrouchStart
+            animator.Play("CrouchStart");  // Animation de début d'accroupissement
+            Invoke(nameof(StartCrouchIdle), animator.GetCurrentAnimatorStateInfo(0).length);  // Passer à l'Idle accroupi après l'animation de début
         }
-        else if (!crouchInput && isCrouching) // Si on arrête de s'accroupir
+        else if (!crouchInput && isCrouching)
         {
             isCrouching = false;
-            animator.SetBool("IsCrouching", false);
-            animator.SetTrigger("CrouchEnd"); // Active l'animation CrouchEnd
+            animator.Play("CrouchEnd");  // Animation de fin d'accroupissement
+        }
+    }
+
+    void StartCrouchIdle()
+    {
+        if (isCrouching)
+        {
+            animator.Play("CrouchIdle");  // Jouer l'animation Idle après le Start
         }
     }
 }

@@ -1,9 +1,18 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
+
+[System.Serializable]
+public class InventoryItem
+{
+    public string itemName;
+    public Sprite itemIcon;
+    public int quantity;
+    public string description;
+}
 
 public class Inventory : MonoBehaviour
 {
-    public List<GameObject> inventory = new List<GameObject>();
+    public List<InventoryItem> inventory = new List<InventoryItem>();
     private InventoryUI inventoryUI;
 
     void Start()
@@ -15,15 +24,23 @@ public class Inventory : MonoBehaviour
     {
         if (other.CompareTag("Loot"))
         {
-            PickUpItem(other.gameObject);
+            PickUpItem(other.GetComponent<ItemPickup>().GetInventoryItem());
         }
     }
 
-    void PickUpItem(GameObject item)
+    // Modifier la méthode PickUpItem pour la rendre publique
+    public void PickUpItem(InventoryItem item)
     {
-        inventory.Add(item);
-        Destroy(item);
-        Debug.Log("Item added to inventory!");
-        inventoryUI.UpdateInventoryUI(); // Mettre à jour l'UI à chaque ramassage d'objet
+        InventoryItem existingItem = inventory.Find(i => i.itemName == item.itemName);
+        if (existingItem != null)
+        {
+            existingItem.quantity += item.quantity; // Ajouter la quantité si l'objet est déjà présent
+        }
+        else
+        {
+            inventory.Add(item); // Ajouter un nouvel objet
+        }
+        Debug.Log(item.itemName + " ajouté à l'inventaire !");
+        inventoryUI.UpdateInventoryUI();
     }
 }

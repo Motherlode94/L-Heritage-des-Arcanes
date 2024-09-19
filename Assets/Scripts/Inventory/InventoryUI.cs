@@ -1,8 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
 
 public class InventoryUI : MonoBehaviour
 {
@@ -28,10 +25,10 @@ public class InventoryUI : MonoBehaviour
         }
 
         // Ajouter les objets de l'inventaire à l'UI
-        foreach (GameObject item in inventory.inventory)
+        foreach (InventoryItem item in inventory.inventory)
         {
             GameObject itemSlot = Instantiate(itemSlotPrefab, itemSlotContainer);
-            itemSlot.GetComponentInChildren<Text>().text = item.name; // Afficher le nom de l'item
+            itemSlot.GetComponentInChildren<Text>().text = item.itemName; // Afficher le nom de l'item
         }
     }
 

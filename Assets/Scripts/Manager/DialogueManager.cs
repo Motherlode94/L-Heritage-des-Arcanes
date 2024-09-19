@@ -1,3 +1,4 @@
+using System;  // Ajoutez cette ligne pour utiliser le type Action
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -30,7 +31,8 @@ public class DialogueManager : MonoBehaviour
         }
     }
 
-    public void ShowChoices(string[] choices)
+    // Modifier la méthode ShowChoices pour prendre en charge les choix et les conséquences
+    public void ShowChoices(string[] choices, Action[] consequences)
     {
         for (int i = 0; i < choiceButtons.Length; i++)
         {
@@ -39,7 +41,12 @@ public class DialogueManager : MonoBehaviour
                 choiceButtons[i].gameObject.SetActive(true);
                 choiceButtons[i].GetComponentInChildren<Text>().text = choices[i];
                 int choiceIndex = i;
-                choiceButtons[i].onClick.AddListener(() => OnChoiceSelected(choiceIndex));
+
+                // Effacer les anciens écouteurs avant d'ajouter de nouveaux
+                choiceButtons[i].onClick.RemoveAllListeners();
+
+                // Ajouter l'action appropriée en fonction du choix sélectionné
+                choiceButtons[i].onClick.AddListener(() => OnChoiceSelected(choiceIndex, consequences[choiceIndex]));
             }
             else
             {
@@ -48,20 +55,17 @@ public class DialogueManager : MonoBehaviour
         }
     }
 
-    public void OnChoiceSelected(int choiceIndex)
+    // Ajouter une méthode pour gérer la sélection des choix
+    public void OnChoiceSelected(int choiceIndex, Action consequence)
     {
-        Debug.Log("Choice " + choiceIndex + " selected");
-        // Gérer les conséquences des choix ici, par exemple affecter des quêtes
-        if (choiceIndex == 0)
-        {
-            questManager.CompleteQuest("Find the Magic Stone");
-        }
+        Debug.Log("Choix " + choiceIndex + " sélectionné");
+        consequence?.Invoke(); // Exécuter la conséquence associée au choix
         EndDialogue();
     }
 
     public void EndDialogue()
     {
-        Debug.Log("End of dialogue.");
+        Debug.Log("Fin du dialogue.");
         foreach (Button button in choiceButtons)
         {
             button.gameObject.SetActive(false);

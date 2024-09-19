@@ -1,9 +1,11 @@
+using System;
 using UnityEngine;
 
 public class NPCDialogue : MonoBehaviour
 {
     public string[] dialogueLines;
-    public string[] playerChoices; // Les choix que le joueur peut faire
+    public string[] playerChoices;
+    public Action[] choiceConsequences; // Actions à déclencher pour chaque choix
     public DialogueManager dialogueManager;
 
     public void TriggerDialogue()
@@ -11,7 +13,7 @@ public class NPCDialogue : MonoBehaviour
         dialogueManager.StartDialogue(this);
         if (playerChoices.Length > 0)
         {
-            dialogueManager.ShowChoices(playerChoices);
+            dialogueManager.ShowChoices(playerChoices, choiceConsequences);
         }
     }
 }
