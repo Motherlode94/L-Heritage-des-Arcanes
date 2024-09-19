@@ -4,14 +4,14 @@ using UnityEngine.InputSystem;
 
 public class CameraSwitcher : MonoBehaviour
 {
-    public Camera firstPersonCamera;   // Caméra pour la vue à la première personne
-    public Camera thirdPersonCamera;   // Caméra pour la vue à la troisième personne
-    public Camera topDownCamera;       // Caméra pour la vue d'aigle
+    public Camera firstPersonCamera;
+    public Camera thirdPersonCamera;
+    public Camera topDownCamera;
 
-    public float transitionDuration = 1.5f;  // Durée de la transition douce
-    public AnimationCurve transitionCurve;   // Pour ajuster la courbe de transition
+    public float transitionDuration = 1.5f;  
+    public AnimationCurve transitionCurve;
 
-    private PlayerControls playerControls;   // Système d'input
+    private PlayerControls playerControls;
 
     private void Awake()
     {
@@ -31,10 +31,9 @@ public class CameraSwitcher : MonoBehaviour
 
     private void Start()
     {
-        SetThirdPersonView();  // Par défaut, on commence en vue à la troisième personne
+        SetThirdPersonView();  // Démarrer en vue troisième personne
     }
 
-    // Appelé lorsqu'on appuie sur le bouton pour changer de vue
     private void OnSwitchCameraView(InputAction.CallbackContext context)
     {
         if (thirdPersonCamera.enabled)
@@ -51,42 +50,36 @@ public class CameraSwitcher : MonoBehaviour
         }
     }
 
-    // Transition douce entre deux caméras
     private IEnumerator SmoothTransition(Camera fromCamera, Camera toCamera, float duration)
     {
         float elapsedTime = 0f;
 
-        // Capturer la position, rotation et FOV de départ
         Vector3 startPosition = fromCamera.transform.position;
         Quaternion startRotation = fromCamera.transform.rotation;
         float startFOV = fromCamera.fieldOfView;
 
-        // Capture des valeurs de la caméra cible
         Vector3 endPosition = toCamera.transform.position;
         Quaternion endRotation = toCamera.transform.rotation;
         float endFOV = toCamera.fieldOfView;
 
-        toCamera.enabled = true;  // Activer la caméra cible dès le début de la transition
-        toCamera.fieldOfView = startFOV;  // Synchroniser les FOV pour une transition fluide
+        toCamera.enabled = true;
 
         while (elapsedTime < duration)
         {
             elapsedTime += Time.deltaTime;
             float t = elapsedTime / duration;
-            t = transitionCurve.Evaluate(t);  // Utiliser une courbe pour lisser la transition
+            t = transitionCurve.Evaluate(t);
 
-            // Interpolation des positions, rotations et champ de vision
             toCamera.transform.position = Vector3.Lerp(startPosition, endPosition, t);
             toCamera.transform.rotation = Quaternion.Slerp(startRotation, endRotation, t);
             toCamera.fieldOfView = Mathf.Lerp(startFOV, endFOV, t);
 
-            yield return null;  // Attendre une frame
+            yield return null;
         }
 
-        fromCamera.enabled = false;  // Désactiver la caméra source à la fin de la transition
+        fromCamera.enabled = false;
     }
 
-    // Méthode pour passer directement en vue à la première personne
     private void SetFirstPersonView()
     {
         firstPersonCamera.enabled = true;
@@ -94,7 +87,6 @@ public class CameraSwitcher : MonoBehaviour
         topDownCamera.enabled = false;
     }
 
-    // Méthode pour passer directement en vue à la troisième personne
     private void SetThirdPersonView()
     {
         firstPersonCamera.enabled = false;
@@ -102,7 +94,6 @@ public class CameraSwitcher : MonoBehaviour
         topDownCamera.enabled = false;
     }
 
-    // Méthode pour passer directement en vue d'aigle
     private void SetTopDownView()
     {
         firstPersonCamera.enabled = false;

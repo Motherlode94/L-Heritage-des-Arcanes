@@ -10,21 +10,25 @@ public class PlayerAnimation : MonoBehaviour
     private bool isIdle = true;
     private bool isWalkingFW = false;
     private bool isWalkingBW = false;
-    private bool isJumping = false;
+    private bool isCrouching = false;
     private bool isSprinting = false;
+    private bool isJumping = false;
+    private bool isFalling = false;
+    private bool isLanding = false;
 
     public float walkSpeed = 2f;
+    public float crouchSpeed = 1.5f;
     public float sprintSpeed = 5f;
     public float mouseSensitivity = 100f;
-    public float rotationSmoothTime = 0.1f;
     private float xRotation = 0f;
 
     private CharacterController characterController;
     private PlayerControls playerControls;
-    private Vector2 movementInput = Vector2.zero; // Initialiser correctement
+    private Vector2 movementInput = Vector2.zero;
     private Vector2 lookInput;
     private bool jumpInput;
     private bool sprintInput;
+    private bool crouchInput;
 
     void Awake()
     {
@@ -33,12 +37,13 @@ public class PlayerAnimation : MonoBehaviour
 
         // Actions liées au mouvement
         playerControls.Player.Move.performed += ctx => movementInput = ctx.ReadValue<Vector2>();
-        playerControls.Player.Move.canceled += ctx => movementInput = Vector2.zero; // Réinitialisation du mouvement
+        playerControls.Player.Move.canceled += ctx => movementInput = Vector2.zero;
 
         playerControls.Player.Look.performed += ctx => lookInput = ctx.ReadValue<Vector2>();
         playerControls.Player.Jump.performed += ctx => jumpInput = true;
         playerControls.Player.Sprint.performed += ctx => sprintInput = true;
         playerControls.Player.Sprint.canceled += ctx => sprintInput = false;
+        playerControls.Player.Crouch.performed += ctx => crouchInput = !crouchInput;
     }
 
     void OnEnable()
@@ -56,35 +61,61 @@ public class PlayerAnimation : MonoBehaviour
         HandleMovement();
         HandleMouseLook();
         HandleAnimations();
+        HandleCrouch();
     }
 
     void HandleMovement()
     {
-        Vector3 move = transform.right * movementInput.x + transform.forward * movementInput.y;
+    
+    Vector3 move = transform.right * movementInput.x + transform.forward * movementInput.y;
 
-        if (sprintInput && movementInput.y > 0)
-        {
-            isSprinting = true;
-            characterController.Move(move * sprintSpeed * Time.deltaTime);
-        }
-        else
-        {
-            isSprinting = false;
-            characterController.Move(move * walkSpeed * Time.deltaTime);
-        }
+    if (sprintInput && movementInput.y > 0 && !isCrouching)
+    {
+        isSprinting = true;
+        characterController.Move(move * sprintSpeed * Time.deltaTime);
+    }
+    else if (crouchInput)
+    {
+        isCrouching = true;
+        characterController.Move(move * crouchSpeed * Time.deltaTime);
+    }
+    else
+    {
+        isSprinting = false;
+        isCrouching = false;
+        characterController.Move(move * walkSpeed * Time.deltaTime);
+    }
 
-        isWalkingFW = (movementInput.y > 0);
-        isWalkingBW = (movementInput.y < 0);
+    isWalkingFW = (movementInput.y > 0);
+    isWalkingBW = (movementInput.y < 0);
 
-        if (jumpInput)
-        {
-            isJumping = true;
-            jumpInput = false; // Réinitialiser le saut
-        }
-        else
-        {
-            isJumping = false;
-        }
+    // Gestion du saut, de la chute, et de l'atterrissage
+    if (jumpInput && characterController.isGrounded)
+    {
+        isJumping = true;
+        isFalling = false;
+        isLanding = false;
+
+        animator.SetBool("isJumping", true);
+        animator.SetBool("isFalling", false);
+        animator.ResetTrigger("isLanding");
+
+        jumpInput = false;
+    }
+    else if (!characterController.isGrounded && !isJumping)
+    {
+        isFalling = true;
+        animator.SetBool("isFalling", true);
+        animator.SetBool("isJumping", false);
+    }
+    else if (characterController.isGrounded && isFalling)
+    {
+        isFalling = false;
+        isLanding = true;
+
+        animator.SetTrigger("isLanding");  // Déclencher l'animation d'atterrissage
+        animator.SetBool("isFalling", false);
+    }
     }
 
     void HandleMouseLook()
@@ -101,13 +132,45 @@ public class PlayerAnimation : MonoBehaviour
 
     void HandleAnimations()
     {
-        // Détecter si le joueur est inactif
-        isIdle = movementInput == Vector2.zero && !isSprinting && !isJumping;
+        // Gestion des animations d'accroupissement via blend tree
+        if (isCrouching)
+        {
+            animator.SetFloat("Horizontal", movementInput.x);
+            animator.SetFloat("Vertical", movementInput.y);
 
-        animator.SetBool("Idle", isIdle);
-        animator.SetBool("WalkFW", isWalkingFW);
-        animator.SetBool("WalkBW", isWalkingBW);
-        animator.SetBool("Jump", isJumping);
-        animator.SetBool("Sprint", isSprinting);
+            if (movementInput == Vector2.zero)
+            {
+                animator.Play("CrouchIdle");
+            }
+            else
+            {
+                // Crouch blend tree handle
+                animator.SetBool("CrouchMoving", true);
+            }
+        }
+        else
+        {
+            // Gestion des animations classiques
+            isIdle = movementInput == Vector2.zero && !isSprinting && !isJumping && !isFalling && !isLanding;
+            animator.SetBool("Idle", isIdle);
+            animator.SetBool("WalkFW", isWalkingFW);
+            animator.SetBool("WalkBW", isWalkingBW);
+            animator.SetBool("Sprint", isSprinting);
+        }
+    }
+
+    void HandleCrouch()
+    {
+        if (crouchInput && !isCrouching) // Si on commence à s'accroupir
+        {
+            isCrouching = true;
+            animator.SetBool("IsCrouching", true); // Active l'animation CrouchStart
+        }
+        else if (!crouchInput && isCrouching) // Si on arrête de s'accroupir
+        {
+            isCrouching = false;
+            animator.SetBool("IsCrouching", false);
+            animator.SetTrigger("CrouchEnd"); // Active l'animation CrouchEnd
+        }
     }
 }

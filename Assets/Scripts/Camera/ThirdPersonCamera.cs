@@ -1,6 +1,6 @@
-using System.Collections; // Import System.Collections for IEnumerator
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 public class ThirdPersonCamera : MonoBehaviour
 {
@@ -11,7 +11,6 @@ public class ThirdPersonCamera : MonoBehaviour
     public float zoomSpeed = 2f;
     public float minZoom = 2f;
     public float maxZoom = 8f;
-    public float collisionOffset = 0.2f;
 
     private Vector2 rotationInput;
     private float currentZoom = 5f;
@@ -19,41 +18,16 @@ public class ThirdPersonCamera : MonoBehaviour
     private float currentPitch = 0f;
     private PlayerControls playerControls;
 
-    // Method to start camera transition
-    public void StartCameraTransition(Transform newTargetPosition, float duration)
-    {
-        StartCoroutine(CameraTransition(newTargetPosition, duration));
-    }
-
-    private IEnumerator CameraTransition(Transform newTargetPosition, float duration)
-    {
-        Vector3 startPosition = transform.position;
-        Quaternion startRotation = transform.rotation;
-        float timeElapsed = 0f;
-
-        while (timeElapsed < duration)
-        {
-            transform.position = Vector3.Lerp(startPosition, newTargetPosition.position, timeElapsed / duration);
-            transform.rotation = Quaternion.Slerp(startRotation, newTargetPosition.rotation, timeElapsed / duration);
-            timeElapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        // Snap to the final position and rotation
-        transform.position = newTargetPosition.position;
-        transform.rotation = newTargetPosition.rotation;
-    }
-
     private void Awake()
     {
-        playerControls = new PlayerControls(); // Initialize input controls
+        playerControls = new PlayerControls(); // Initialiser les contrôles d'entrée
     }
 
     private void OnEnable()
     {
-        playerControls.Player.Look.performed += OnLook;  // Register camera rotation (look) action
-        playerControls.Player.Look.canceled += OnLookCanceled;  // Reset rotation input when canceled
-        playerControls.Player.Zoom.performed += OnZoom;  // Register zoom action
+        playerControls.Player.Look.performed += OnLook;  // Associer l'action de rotation de la caméra
+        playerControls.Player.Look.canceled += OnLookCanceled;  // Réinitialiser l'entrée de rotation
+        playerControls.Player.Zoom.performed += OnZoom;  // Associer l'action de zoom
         playerControls.Player.Enable();
     }
 
@@ -87,8 +61,6 @@ public class ThirdPersonCamera : MonoBehaviour
     private void LateUpdate()
     {
         HandleRotation();
-        HandleZoom();
-        HandleCollision();
         UpdateCameraPosition();
     }
 
@@ -96,12 +68,7 @@ public class ThirdPersonCamera : MonoBehaviour
     {
         currentYaw += rotationInput.x * rotationSpeed * Time.deltaTime;
         currentPitch -= rotationInput.y * rotationSpeed * Time.deltaTime;
-        currentPitch = Mathf.Clamp(currentPitch, -30f, 60f);
-    }
-
-    private void HandleZoom()
-    {
-        // The zooming is now handled by OnZoom(), adjusting the 'currentZoom' value
+        currentPitch = Mathf.Clamp(currentPitch, -30f, 60f);  // Limiter l'angle vertical
     }
 
     private void UpdateCameraPosition()
@@ -113,15 +80,28 @@ public class ThirdPersonCamera : MonoBehaviour
         transform.LookAt(player.position + Vector3.up * 2f);
     }
 
-    private void HandleCollision()
+    // Méthode pour démarrer la transition de la caméra
+    public void StartCameraTransition(Transform newTargetPosition, float duration)
     {
-        RaycastHit hit;
-        Vector3 direction = (transform.position - player.position).normalized;
+        StartCoroutine(CameraTransition(newTargetPosition, duration));
+    }
 
-        if (Physics.Raycast(player.position, direction, out hit, currentZoom))
+    private IEnumerator CameraTransition(Transform newTargetPosition, float duration)
+    {
+        Vector3 startPosition = transform.position;
+        Quaternion startRotation = transform.rotation;
+        float timeElapsed = 0f;
+
+        while (timeElapsed < duration)
         {
-            float adjustedZoom = Mathf.Clamp(hit.distance - collisionOffset, minZoom, maxZoom);
-            currentZoom = Mathf.Lerp(currentZoom, adjustedZoom, Time.deltaTime * zoomSpeed);
+            transform.position = Vector3.Lerp(startPosition, newTargetPosition.position, timeElapsed / duration);
+            transform.rotation = Quaternion.Slerp(startRotation, newTargetPosition.rotation, timeElapsed / duration);
+            timeElapsed += Time.deltaTime;
+            yield return null;
         }
+
+        // Fixer la position et la rotation finales
+        transform.position = newTargetPosition.position;
+        transform.rotation = newTargetPosition.rotation;
     }
 }
