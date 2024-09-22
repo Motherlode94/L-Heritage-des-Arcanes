@@ -7,7 +7,11 @@ public class PlayerMovement : MonoBehaviour
     public float crouchSpeed = 2f;
     public float sprintSpeed = 10f;
     public float swimSpeed = 3f;
+    public float turnSpeed = 200f;
     public float jumpForce = 10f;
+    public float zoomSpeed = 2f;
+    public float minZoom = 2f;
+    public float maxZoom = 8f;
     public int maxJumps = 2;
     public float movementSmoothing = 0.1f;
 
@@ -20,6 +24,7 @@ public class PlayerMovement : MonoBehaviour
     private float currentSpeed;
     private bool crouchInput, sprintInput, jumpInput;
     private bool movementPressed, runPressed;
+    private float currentZoom = 5f;
 
     public Transform cameraTransform;
     public float normalHeight = 2f;
@@ -33,7 +38,8 @@ public class PlayerMovement : MonoBehaviour
     public LayerMask waterMask;
 
     // Hash des animations
-    int isWalkingHash;
+    int isWalkingForwardHash;
+    int isWalkingBackwardHash;
     int isRunningHash;
     int isJumpingHash;
     int isFallingHash;
@@ -62,8 +68,11 @@ public class PlayerMovement : MonoBehaviour
         playerControls.Player.Sprint.performed += ctx => runPressed = ctx.ReadValueAsButton();
         playerControls.Player.Sprint.canceled += ctx => runPressed = false;
 
+        playerControls.Player.Zoom.performed += ctx => Zoom(ctx.ReadValue<float>());
+
         // Hash des animations
-        isWalkingHash = Animator.StringToHash("isWalking");
+        isWalkingForwardHash = Animator.StringToHash("isWalkingForward");
+        isWalkingBackwardHash = Animator.StringToHash("isWalkingBackward");
         isRunningHash = Animator.StringToHash("isRunning");
         isJumpingHash = Animator.StringToHash("isJumping");
         isFallingHash = Animator.StringToHash("isFalling");
@@ -124,10 +133,16 @@ public class PlayerMovement : MonoBehaviour
         UpdateSpeed();
 
         Vector3 direction = GetMovementDirection();
-        Vector3 targetVelocity = new Vector3(direction.x * currentSpeed, rb.velocity.y, direction.z * currentSpeed);
-        rb.velocity = Vector3.SmoothDamp(rb.velocity, targetVelocity, ref velocity, movementSmoothing);
+        Vector3 targetVelocity = direction * currentSpeed;
 
-        // Activer les animations pour la marche ou la course
+        rb.velocity = Vector3.SmoothDamp(rb.velocity, new Vector3(targetVelocity.x, rb.velocity.y, targetVelocity.z), ref velocity, movementSmoothing);
+
+        if (movementPressed)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * turnSpeed);
+        }
+
         UpdateAnimations();
     }
 
@@ -137,20 +152,21 @@ public class PlayerMovement : MonoBehaviour
         Vector3 targetVelocity = new Vector3(direction.x * swimSpeed, direction.y * swimSpeed, direction.z * swimSpeed);
         rb.velocity = Vector3.SmoothDamp(rb.velocity, targetVelocity, ref velocity, movementSmoothing);
 
-        // Activer l'animation de natation
         animator.SetBool(isSwimmingHash, true);
-        animator.SetBool(isWalkingHash, false);  // Désactiver la marche pendant la nage
-        animator.SetBool(isRunningHash, false);  // Désactiver la course pendant la nage
+        animator.SetBool(isWalkingForwardHash, false);
+        animator.SetBool(isRunningHash, false);
     }
 
     private void UpdateAnimations()
     {
-        bool isWalking = movementPressed && !runPressed && !crouchInput && !isJumping && !isFalling;
-        bool isRunning = movementPressed && runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isWalkingForward = movementPressed && movementInput.y > 0 && !runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isWalkingBackward = movementPressed && movementInput.y < 0 && !runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isRunning = movementPressed && runPressed && movementInput.y > 0 && !crouchInput && !isJumping && !isFalling;
         bool isIdle = !movementPressed && !isJumping && !isFalling;
         bool isCrouching = crouchInput;
 
-        animator.SetBool(isWalkingHash, isWalking);
+        animator.SetBool(isWalkingForwardHash, isWalkingForward);
+        animator.SetBool(isWalkingBackwardHash, isWalkingBackward);
         animator.SetBool(isRunningHash, isRunning);
         animator.SetBool("isIdle", isIdle);
         animator.SetBool(isCrouchingHash, isCrouching);
@@ -177,7 +193,7 @@ public class PlayerMovement : MonoBehaviour
             currentSpeed = crouchSpeed;
             HandleCrouch();
         }
-        else if (runPressed && !crouchInput)
+        else if (runPressed && movementInput.y > 0)
         {
             currentSpeed = sprintSpeed;
         }
@@ -207,7 +223,6 @@ public class PlayerMovement : MonoBehaviour
     private void CheckSwimmingStatus()
     {
         isSwimming = Physics.CheckSphere(groundCheck.position, groundDistance, waterMask);
-
         rb.useGravity = !isSwimming;
     }
 
@@ -252,5 +267,12 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool(isJumpingHash, false);
             animator.SetBool(isLandingHash, true);
         }
+    }
+
+    private void Zoom(float scrollAmount)
+    {
+        currentZoom -= scrollAmount * zoomSpeed;
+        currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
+        cameraTransform.localPosition = new Vector3(cameraTransform.localPosition.x, cameraTransform.localPosition.y, -currentZoom);
     }
 }

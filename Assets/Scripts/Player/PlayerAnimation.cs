@@ -7,17 +7,21 @@ public class PlayerAnimation : MonoBehaviour
     public Transform playerBody;
     public Transform playerCamera;
 
-    private bool isCrouching = false;
-    private bool isJumping = false;
-    private bool isSwimming = false;  // Ajout du contrôle de natation
+    // Énumération des différents états
+    private enum PlayerState { Idle, Walking, Running, Crouching, Swimming, Jumping }
+    private PlayerState currentState;
 
     public float walkSpeed = 2f;
     public float crouchSpeed = 1.5f;
     public float sprintSpeed = 5f;
-    public float swimSpeed = 3f;  // Vitesse de natation
+    public float swimSpeed = 3f;
     public float mouseSensitivity = 100f;
     public float rotationSmoothTime = 0.1f;
+    public float zoomSpeed = 2f;
+    public float minZoom = 2f;
+    public float maxZoom = 8f;
     private float xRotation = 0f;
+    private float currentZoom = 5f;
 
     private CharacterController characterController;
     private PlayerControls playerControls;
@@ -26,13 +30,13 @@ public class PlayerAnimation : MonoBehaviour
     private bool jumpInput;
     private bool sprintInput;
     private bool crouchInput;
+    private bool isSwimming = false;
 
-    void Awake()
+    private void Awake()
     {
         characterController = GetComponent<CharacterController>();
         playerControls = new PlayerControls();
 
-        // Actions liées au mouvement
         playerControls.Player.Move.performed += ctx => movementInput = ctx.ReadValue<Vector2>();
         playerControls.Player.Move.canceled += ctx => movementInput = Vector2.zero;
 
@@ -41,63 +45,110 @@ public class PlayerAnimation : MonoBehaviour
         playerControls.Player.Sprint.performed += ctx => sprintInput = true;
         playerControls.Player.Sprint.canceled += ctx => sprintInput = false;
         playerControls.Player.Crouch.performed += ctx => crouchInput = !crouchInput;
+
+        playerControls.Player.Zoom.performed += ctx => HandleZoom(ctx.ReadValue<float>());
+
+        // Initialisation de l'état à Idle
+        currentState = PlayerState.Idle;
     }
 
-    void OnEnable()
+    private void OnEnable()
     {
         playerControls.Player.Enable();
     }
 
-    void OnDisable()
+    private void OnDisable()
     {
         playerControls.Player.Disable();
     }
 
-    void Update()
+    private void Update()
     {
-        HandleMovement();
         HandleMouseLook();
-        HandleCrouch();
+        HandleStateTransitions();
+        UpdateAnimationParameters();
         AlignBodyToCamera();
-        UpdateAnimationParameters();  // Mise à jour des paramètres du Blend Tree
+        AdjustCameraZoom();
     }
 
-    void HandleMovement()
+    // Méthode pour gérer les transitions d'état
+    private void HandleStateTransitions()
     {
-        Vector3 move = transform.right * movementInput.x + transform.forward * movementInput.y;
-
         if (isSwimming)
         {
-            HandleSwimming(move);
+            SetState(PlayerState.Swimming);
+            HandleMovement(swimSpeed);
+            return;
+        }
+
+        if (crouchInput)
+        {
+            SetState(PlayerState.Crouching);
+            HandleMovement(crouchSpeed);
+            return;
+        }
+
+        if (sprintInput && movementInput.y > 0)
+        {
+            SetState(PlayerState.Running);
+            HandleMovement(sprintSpeed);
+            return;
+        }
+
+        if (movementInput.magnitude > 0)
+        {
+            SetState(PlayerState.Walking);
+            HandleMovement(walkSpeed);
         }
         else
         {
-            HandleGroundMovement(move);
+            SetState(PlayerState.Idle);
         }
     }
 
-    void HandleGroundMovement(Vector3 move)
+    // Méthode pour passer d'un état à un autre
+    private void SetState(PlayerState newState)
     {
-        float currentSpeed = walkSpeed;
+        if (currentState == newState) return;
 
-        if (sprintInput && movementInput.y > 0 && !isCrouching)
-        {
-            currentSpeed = sprintSpeed;
-        }
-        else if (isCrouching)
-        {
-            currentSpeed = crouchSpeed;
-        }
+        currentState = newState;
 
-        characterController.Move(move * currentSpeed * Time.deltaTime);
+        // Mettre à jour l'animation en fonction de l'état
+        switch (newState)
+        {
+            case PlayerState.Idle:
+                animator.SetBool("isIdle", true);
+                animator.SetBool("isWalking", false);
+                animator.SetBool("isRunning", false);
+                animator.SetBool("isCrouching", false);
+                break;
+            case PlayerState.Walking:
+                animator.SetBool("isWalking", true);
+                animator.SetBool("isIdle", false);
+                break;
+            case PlayerState.Running:
+                animator.SetBool("isRunning", true);
+                animator.SetBool("isIdle", false);
+                break;
+            case PlayerState.Crouching:
+                animator.SetBool("isCrouching", true);
+                break;
+            case PlayerState.Swimming:
+                animator.SetBool("isSwimming", true);
+                break;
+            case PlayerState.Jumping:
+                animator.SetBool("isJumping", true);
+                break;
+        }
     }
 
-    void HandleSwimming(Vector3 move)
+    private void HandleMovement(float speed)
     {
-        characterController.Move(move * swimSpeed * Time.deltaTime);
+        Vector3 move = transform.right * movementInput.x + transform.forward * movementInput.y;
+        characterController.Move(move * speed * Time.deltaTime);
     }
 
-    void HandleMouseLook()
+    private void HandleMouseLook()
     {
         float mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
         float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
@@ -109,52 +160,46 @@ public class PlayerAnimation : MonoBehaviour
         playerBody.Rotate(Vector3.up * mouseX);
     }
 
-    void AlignBodyToCamera()
+    private void AlignBodyToCamera()
     {
         Vector3 cameraForward = playerCamera.forward;
-        cameraForward.y = 0;  // Éviter que le joueur se penche ou se lève
+        cameraForward.y = 0;
 
         Quaternion targetRotation = Quaternion.LookRotation(cameraForward);
         playerBody.rotation = Quaternion.Slerp(playerBody.rotation, targetRotation, Time.deltaTime * rotationSmoothTime);
     }
 
-    void HandleCrouch()
+    private void HandleZoom(float zoomInput)
     {
-        if (crouchInput && !isCrouching && !isSwimming) // Pas d'accroupissement en natation
-        {
-            isCrouching = true;
-            animator.SetBool("isCrouching", true);
-        }
-        else if (!crouchInput && isCrouching)
-        {
-            isCrouching = false;
-            animator.SetBool("isCrouching", false);
-        }
+        currentZoom = Mathf.Clamp(currentZoom - zoomInput * zoomSpeed, minZoom, maxZoom);
     }
 
-    void UpdateAnimationParameters()
+    private void AdjustCameraZoom()
     {
-        // Mise à jour des paramètres Horizontal et Vertical pour les Blend Trees
+        playerCamera.localPosition = new Vector3(0, 0, -currentZoom);
+    }
+
+    private void UpdateAnimationParameters()
+    {
         animator.SetFloat("Horizontal", movementInput.x);
         animator.SetFloat("Vertical", movementInput.y);
-        animator.SetBool("isSwimming", isSwimming);  // Activer ou désactiver le Blend Tree de natation
+        animator.SetBool("isSwimming", isSwimming);
     }
 
-    void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Water"))
         {
             isSwimming = true;
-            characterController.enabled = false;  // Désactiver le contrôleur de personnage pour le mouvement de natation
+            characterController.Move(Vector3.zero);
         }
     }
 
-    void OnTriggerExit(Collider other)
+    private void OnTriggerExit(Collider other)
     {
         if (other.CompareTag("Water"))
         {
             isSwimming = false;
-            characterController.enabled = true;  // Réactiver le contrôleur de personnage quand on sort de l'eau
         }
     }
 }
