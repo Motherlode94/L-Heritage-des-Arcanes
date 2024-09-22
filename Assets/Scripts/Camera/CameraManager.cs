@@ -5,7 +5,6 @@ using System.Collections;
 
 public class CameraManager : MonoBehaviour
 {
-    public Camera firstPersonCamera;
     public Camera thirdPersonCamera;
     public Camera topDownCamera;
     public float transitionSpeed = 1.5f; // Temps du fondu
@@ -14,6 +13,7 @@ public class CameraManager : MonoBehaviour
 
     private PlayerControls playerControls;
     private bool isTransitioning = false;
+    private bool topDownUnlocked = false;  // Bonus de la caméra Top-Down
 
     private void Awake()
     {
@@ -38,13 +38,9 @@ public class CameraManager : MonoBehaviour
 
     private void OnSwitchCameraView(InputAction.CallbackContext context)
     {
-        if (!isTransitioning)
+        if (!isTransitioning && topDownUnlocked) // La vue Top-Down n'est accessible que si débloquée
         {
             if (thirdPersonCamera.enabled)
-            {
-                StartCoroutine(TransitionCamera(firstPersonCamera));
-            }
-            else if (firstPersonCamera.enabled)
             {
                 StartCoroutine(TransitionCamera(topDownCamera));
             }
@@ -63,7 +59,6 @@ public class CameraManager : MonoBehaviour
         yield return StartCoroutine(FadeOut());
 
         // Désactiver toutes les caméras au début de la transition
-        firstPersonCamera.enabled = false;
         thirdPersonCamera.enabled = false;
         topDownCamera.enabled = false;
 
@@ -109,27 +104,16 @@ public class CameraManager : MonoBehaviour
         fadeImage.color = color;
     }
 
-    // Méthode pour activer la vue à la première personne
-    private void SetFirstPersonView()
-    {
-        firstPersonCamera.enabled = true;
-        thirdPersonCamera.enabled = false;
-        topDownCamera.enabled = false;
-    }
-
     // Méthode pour activer la vue à la troisième personne
     private void SetThirdPersonView()
     {
         thirdPersonCamera.enabled = true;
-        firstPersonCamera.enabled = false;
         topDownCamera.enabled = false;
     }
 
-    // Méthode pour activer la vue top-down
-    private void SetTopDownView()
+    // Méthode pour activer la vue top-down une fois débloquée
+    public void UnlockTopDownView()
     {
-        topDownCamera.enabled = true;
-        thirdPersonCamera.enabled = false;
-        firstPersonCamera.enabled = false;
+        topDownUnlocked = true;
     }
 }

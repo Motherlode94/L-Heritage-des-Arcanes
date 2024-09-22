@@ -1,32 +1,35 @@
 using UnityEngine;
-using System.Collections;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 public class ThirdPersonCamera : MonoBehaviour
 {
     public Transform player;
-    public Vector3 offset = new Vector3(0, 3, -5);
-    public float smoothSpeed = 0.125f;
-    public float rotationSpeed = 2f;
+    public Vector3 offset;
+    public float smoothSpeed = 0.15f;
+    public float rotationSpeed = 80f;
     public float zoomSpeed = 2f;
     public float minZoom = 2f;
     public float maxZoom = 8f;
 
-    private Vector2 rotationInput;
+    private PlayerControls playerControls;
     private float currentZoom = 5f;
     private float currentYaw = 0f;
     private float currentPitch = 0f;
-    private PlayerControls playerControls;
+    private Vector2 lookInput;
+    private Vector3 velocity = Vector3.zero;
 
     private void Awake()
     {
+        // Initialize the offset
+        offset = new Vector3(0, 3f, -5f);
         playerControls = new PlayerControls();
     }
 
     private void OnEnable()
     {
         playerControls.Player.Look.performed += OnLook;
-        playerControls.Player.Look.canceled += OnLookCanceled;
+        playerControls.Player.Look.canceled += ctx => lookInput = Vector2.zero;
         playerControls.Player.Zoom.performed += OnZoom;
         playerControls.Player.Enable();
     }
@@ -38,72 +41,78 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void LateUpdate()
     {
-        HandleRotation();
+        HandleCameraRotation();
         UpdateCameraPosition();
     }
 
-    public void OnLook(InputAction.CallbackContext context)
+    private void FixedUpdate()
     {
-        if (context.performed)
-        {
-            rotationInput = context.ReadValue<Vector2>();
-        }
+        // Smooth camera movement
+        Vector3 direction = Quaternion.Euler(currentPitch, currentYaw, 0) * Vector3.forward;
+        Vector3 desiredPosition = player.position - direction * currentZoom + offset;
+        transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref velocity, smoothSpeed);
     }
 
-    public void OnLookCanceled(InputAction.CallbackContext context)
+    private void OnLook(InputAction.CallbackContext context)
     {
-        rotationInput = Vector2.zero;
+        lookInput = context.ReadValue<Vector2>();
     }
 
-    public void OnZoom(InputAction.CallbackContext context)
+    private void OnZoom(InputAction.CallbackContext context)
     {
-        if (context.performed)
-        {
-            float zoomChange = context.ReadValue<float>();
-            // On utilise la molette de la souris pour zoomer ou dézoomer
-            currentZoom = Mathf.Clamp(currentZoom - zoomChange * zoomSpeed, minZoom, maxZoom);
-        }
+        float zoomChange = context.ReadValue<float>();
+        currentZoom = Mathf.Clamp(currentZoom - zoomChange * zoomSpeed, minZoom, maxZoom);
     }
 
-    private void HandleRotation()
+    private void HandleCameraRotation()
     {
-        currentYaw += rotationInput.x * rotationSpeed * Time.deltaTime;
-        currentPitch -= rotationInput.y * rotationSpeed * Time.deltaTime;
-        currentPitch = Mathf.Clamp(currentPitch, -30f, 60f); // Limite verticale de la caméra
+        // Smooth camera rotation
+        currentYaw += lookInput.x * rotationSpeed * Time.deltaTime;
+        currentPitch -= lookInput.y * rotationSpeed * Time.deltaTime;
+        currentPitch = Mathf.Clamp(currentPitch, -30f, 60f);  // Limit vertical rotation
     }
 
     private void UpdateCameraPosition()
     {
+        // Adjust camera position smoothly
         Quaternion rotation = Quaternion.Euler(currentPitch, currentYaw, 0);
-        Vector3 desiredPosition = player.position - rotation * Vector3.forward * currentZoom + offset;
+        Vector3 direction = rotation * Vector3.forward;
 
-        // Appliquer une interpolation fluide pour le zoom et la position
+        Vector3 desiredPosition = player.position - direction * currentZoom + offset;
+
+        // Smooth transition without random values
         transform.position = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
-        transform.LookAt(player.position + Vector3.up * 2f);
+
+        // Make sure the camera is looking at the player
+        transform.LookAt(player.position + Vector3.up * 1.5f);  // Slightly above the player
     }
 
-    public void StartCameraTransition(Transform newTargetPosition, float duration)
-{
-    StartCoroutine(CameraTransition(newTargetPosition, duration));
-}
-
-private IEnumerator CameraTransition(Transform newTargetPosition, float duration)
-{
-    Vector3 startPosition = transform.position;
-    Quaternion startRotation = transform.rotation;
-    float timeElapsed = 0f;
-
-    while (timeElapsed < duration)
+    // Implement a method for camera transitions
+    public void StartCameraTransition(Transform newCameraPosition, float duration)
     {
-        transform.position = Vector3.Lerp(startPosition, newTargetPosition.position, timeElapsed / duration);
-        transform.rotation = Quaternion.Slerp(startRotation, newTargetPosition.rotation, timeElapsed / duration);
-        timeElapsed += Time.deltaTime;
-        yield return null;
+        StartCoroutine(CameraTransition(newCameraPosition, duration));
     }
 
-    // S'assurer que la caméra atteint la position et la rotation finales
-    transform.position = newTargetPosition.position;
-    transform.rotation = newTargetPosition.rotation;
-}
+    private IEnumerator CameraTransition(Transform newCameraPosition, float duration)
+    {
+        // Store starting position and rotation
+        Vector3 startPosition = transform.position;
+        Quaternion startRotation = transform.rotation;
 
+        float elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            // Smoothly interpolate position and rotation using Lerp and Slerp
+            transform.position = Vector3.Lerp(startPosition, newCameraPosition.position, elapsedTime / duration);
+            transform.rotation = Quaternion.Slerp(startRotation, newCameraPosition.rotation, elapsedTime / duration);
+
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        // Ensure the camera reaches the final position and rotation
+        transform.position = newCameraPosition.position;
+        transform.rotation = newCameraPosition.rotation;
+    }
 }

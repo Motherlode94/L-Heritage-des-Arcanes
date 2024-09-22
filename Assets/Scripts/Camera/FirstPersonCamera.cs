@@ -3,10 +3,8 @@ using UnityEngine.InputSystem;
 
 public class FirstPersonCamera : MonoBehaviour
 {
-    public Transform player;
-    public float mouseSensitivity = 100f;
     public Transform playerBody;
-
+    public float mouseSensitivity = 100f;
     private float xRotation = 0f;
     private PlayerControls playerControls;
     private Vector2 lookInput;
@@ -29,7 +27,7 @@ public class FirstPersonCamera : MonoBehaviour
 
     private void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.lockState = CursorLockMode.Locked; // Lock the cursor to the screen center
     }
 
     private void Update()
@@ -47,10 +45,12 @@ public class FirstPersonCamera : MonoBehaviour
         float mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
         float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
 
+        // Vertical rotation (up and down)
         xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limit vertical rotation
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limit vertical rotation to realistic angles
 
-        transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
-        playerBody.Rotate(Vector3.up * mouseX);
+        // Apply rotation to the camera and player body
+        transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);  // Rotate the camera only vertically
+        playerBody.Rotate(Vector3.up * mouseX);  // Rotate the player's body horizontally
     }
 }

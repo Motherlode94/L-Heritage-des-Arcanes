@@ -1,10 +1,9 @@
 using UnityEngine;
-using System.Collections;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 public class CameraSwitcher : MonoBehaviour
 {
-    public Camera firstPersonCamera;
     public Camera thirdPersonCamera;
     public Camera topDownCamera;
     public float transitionDuration = 1.5f;
@@ -37,11 +36,7 @@ public class CameraSwitcher : MonoBehaviour
     {
         if (thirdPersonCamera.enabled)
         {
-            StartCoroutine(SmoothTransition(thirdPersonCamera, firstPersonCamera, transitionDuration));
-        }
-        else if (firstPersonCamera.enabled)
-        {
-            StartCoroutine(SmoothTransition(firstPersonCamera, topDownCamera, transitionDuration));
+            StartCoroutine(SmoothTransition(thirdPersonCamera, topDownCamera, transitionDuration));
         }
         else if (topDownCamera.enabled)
         {
@@ -78,23 +73,14 @@ public class CameraSwitcher : MonoBehaviour
         fromCamera.enabled = false;
     }
 
-    private void SetFirstPersonView()
-    {
-        firstPersonCamera.enabled = true;
-        thirdPersonCamera.enabled = false;
-        topDownCamera.enabled = false;
-    }
-
     private void SetThirdPersonView()
     {
-        firstPersonCamera.enabled = false;
         thirdPersonCamera.enabled = true;
         topDownCamera.enabled = false;
     }
 
     private void SetTopDownView()
     {
-        firstPersonCamera.enabled = false;
         thirdPersonCamera.enabled = false;
         topDownCamera.enabled = true;
     }

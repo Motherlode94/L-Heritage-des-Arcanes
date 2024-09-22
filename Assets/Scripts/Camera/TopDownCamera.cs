@@ -3,9 +3,10 @@ using UnityEngine.InputSystem;
 
 public class TopDownCamera : MonoBehaviour
 {
-    public Transform player;  // Cible à suivre
-    public Vector3 offset = new Vector3(0, 10, 0);  // Position de la caméra au-dessus du joueur
-    public float zoomSpeed = 2f;
+    public Transform player;
+    public float height = 10f;
+    public float smoothSpeed = 0.125f;
+    public float zoomSpeed = 4f;
     public float minZoom = 5f;
     public float maxZoom = 20f;
     private float currentZoom = 10f;
@@ -28,21 +29,21 @@ public class TopDownCamera : MonoBehaviour
         playerControls.Player.Disable();
     }
 
+    private void LateUpdate()
+    {
+        UpdateCameraPosition();
+    }
+
     private void OnZoom(InputAction.CallbackContext context)
     {
         float zoomInput = context.ReadValue<float>();
         currentZoom = Mathf.Clamp(currentZoom - zoomInput * zoomSpeed, minZoom, maxZoom);
     }
 
-    private void LateUpdate()
-    {
-        UpdateCameraPosition();
-    }
-
     private void UpdateCameraPosition()
     {
-        Vector3 desiredPosition = player.position + offset * currentZoom;
-        transform.position = desiredPosition;
-        transform.LookAt(player.position);  // Toujours regarder le joueur
+        Vector3 desiredPosition = player.position + Vector3.up * currentZoom;  // Follow the player from above
+        transform.position = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
+        transform.LookAt(player.position);  // Always look at the player
     }
 }
