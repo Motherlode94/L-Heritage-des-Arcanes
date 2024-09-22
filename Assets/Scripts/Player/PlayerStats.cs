@@ -3,29 +3,48 @@ using UnityEngine.InputSystem;
 
 public class PlayerStats : MonoBehaviour
 {
+    // Player Stats
     public float speed = 5f;
     public int health = 100;
+    public int maxHealth = 100;
     public int attackPower = 10;
-    public int skillPoints = 0; // Skill points available for upgrades
+    public int skillPoints = 0;
     public int level = 1;
     public int experiencePoints = 0;
-    public int experienceThreshold = 100; // XP required to level up
+    public int experienceThreshold = 100;
 
+    // Stamina Settings
+    public float maxStamina = 100f;
+    public float stamina;
+    public float staminaRegenRate = 10f;  // Stamina regen per second
+    public float staminaDrainRate = 20f;  // Stamina drain per second while running
+    public bool isRunning = false;
+
+    // Upgrade costs
     public int speedUpgradeCost = 1;
     public int healthUpgradeCost = 1;
     public int attackUpgradeCost = 1;
 
     private PlayerControls playerControls;
     private InputAction upgradeAction;
+    private UIManager uiManager; // Référence au UIManager pour l'UI
+    private CharacterController characterController;
 
     private void Awake()
     {
         playerControls = new PlayerControls();
-        upgradeAction = playerControls.Player.Upgrade; // Find the "Upgrade" action in the Player input map
+        upgradeAction = playerControls.Player.Upgrade;
+        characterController = GetComponent<CharacterController>();
+
+        stamina = maxStamina; // Initialiser la stamina à son maximum
+
+        // Bind input actions
+        playerControls.Player.Sprint.started += ctx => StartRunning();
+        playerControls.Player.Sprint.canceled += ctx => StopRunning();
 
         if (upgradeAction != null)
         {
-            upgradeAction.performed += ctx => UpgradeStat(StatType.Speed, 1f); // Example: Upgrade speed by default
+            upgradeAction.performed += ctx => UpgradeStat(StatType.Speed, 1f);
         }
         else
         {
@@ -33,14 +52,70 @@ public class PlayerStats : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        // Récupérer le UIManager pour mettre à jour l'UI
+        uiManager = FindObjectOfType<UIManager>();
+        if (uiManager != null)
+        {
+            UpdateUI();
+        }
+    }
+
     private void OnEnable()
     {
-        playerControls.Enable(); // Enable input actions
+        playerControls.Enable();
     }
 
     private void OnDisable()
     {
-        playerControls.Disable(); // Disable input actions
+        playerControls.Disable();
+    }
+
+    private void Update()
+    {
+        HandleStamina();
+        UpdateUI(); // Mettre à jour l'UI en temps réel
+    }
+
+    // Gérer la stamina (diminution et régénération)
+    private void HandleStamina()
+    {
+        if (isRunning && stamina > 0)
+        {
+            // Réduire la stamina pendant que le joueur court
+            stamina -= staminaDrainRate * Time.deltaTime;
+            stamina = Mathf.Clamp(stamina, 0, maxStamina);
+
+            // Si la stamina est épuisée, arrêter la course
+            if (stamina <= 0)
+            {
+                StopRunning();
+            }
+        }
+        else
+        {
+            // Régénérer la stamina lorsque le joueur ne court pas
+            stamina += staminaRegenRate * Time.deltaTime;
+            stamina = Mathf.Clamp(stamina, 0, maxStamina);
+        }
+    }
+
+    // Commence à courir (appelé quand le joueur appuie sur le bouton pour courir)
+    private void StartRunning()
+    {
+        if (stamina > 0)
+        {
+            isRunning = true;
+            speed *= 2; // Doubler la vitesse pendant la course
+        }
+    }
+
+    // Arrête de courir (appelé quand le joueur relâche le bouton pour courir)
+    private void StopRunning()
+    {
+        isRunning = false;
+        speed /= 2; // Revenir à la vitesse normale
     }
 
     // Enum for stat types
@@ -92,10 +167,10 @@ public class PlayerStats : MonoBehaviour
     {
         if (skillPoints >= healthUpgradeCost)
         {
-            health += amount;
+            maxHealth += amount;
             skillPoints -= healthUpgradeCost;
             healthUpgradeCost++;
-            Debug.Log($"Health upgraded by {amount}. New health: {health}. Upgrade cost: {healthUpgradeCost}");
+            Debug.Log($"Health upgraded by {amount}. New max health: {maxHealth}. Upgrade cost: {healthUpgradeCost}");
         }
         else
         {
@@ -118,13 +193,7 @@ public class PlayerStats : MonoBehaviour
         }
     }
 
-    // Method to gain skill points and experience
-    public void EarnSkillPoints(int points)
-    {
-        skillPoints += points;
-        Debug.Log($"Gained skill points: {points}. Total skill points: {skillPoints}");
-    }
-
+    // Method to gain experience and skill points
     public void GainExperience(int xp)
     {
         experiencePoints += xp;
@@ -132,16 +201,31 @@ public class PlayerStats : MonoBehaviour
         {
             LevelUp();
         }
-        Debug.Log($"Gained {xp} XP. Total XP: {experiencePoints}/{experienceThreshold}");
+        UpdateUI();
     }
 
+    // Méthode pour augmenter le niveau
     private void LevelUp()
     {
         level++;
         experiencePoints -= experienceThreshold;
-        experienceThreshold += 50; // Increase the XP threshold for the next level
-        skillPoints += 2; // Award skill points for leveling up
-        Debug.Log($"Level up! Current level: {level}. Skill points available: {skillPoints}");
+        experienceThreshold += 50; // Augmentation de la quantité d'XP requise pour le niveau suivant
+        skillPoints += 2;  // Attribuer des points de compétence au niveau supérieur
+
+        Debug.Log($"Niveau supérieur! Niveau actuel: {level}, XP: {experiencePoints}/{experienceThreshold}, Points de compétence: {skillPoints}");
+        UpdateUI();
+    }
+
+    // Mise à jour de l'UI avec les nouvelles stats
+    private void UpdateUI()
+    {
+        if (uiManager != null)
+        {
+            uiManager.UpdateHealth(health, maxHealth);
+            uiManager.UpdateExperience(experiencePoints, experienceThreshold);
+            uiManager.UpdateLevel(level);
+            uiManager.UpdateStamina(stamina, maxStamina); // Mise à jour de la barre de stamina
+        }
     }
 
     // Method to take damage (used by enemies or environmental hazards)
@@ -153,6 +237,7 @@ public class PlayerStats : MonoBehaviour
             Die(); // Handle player death
         }
         Debug.Log($"Took {damage} damage. Current health: {health}");
+        UpdateUI(); // Update UI after taking damage
     }
 
     private void Die()
@@ -172,6 +257,7 @@ public class PlayerStats : MonoBehaviour
         PlayerPrefs.SetInt("Level", level);
         PlayerPrefs.SetInt("ExperiencePoints", experiencePoints);
         PlayerPrefs.SetInt("ExperienceThreshold", experienceThreshold);
+        PlayerPrefs.SetFloat("Stamina", stamina);
         PlayerPrefs.Save();
         Debug.Log("Player stats saved.");
     }
@@ -185,6 +271,7 @@ public class PlayerStats : MonoBehaviour
         level = PlayerPrefs.GetInt("Level", 1);               // Default is 1
         experiencePoints = PlayerPrefs.GetInt("ExperiencePoints", 0); // Default is 0
         experienceThreshold = PlayerPrefs.GetInt("ExperienceThreshold", 100); // Default is 100
+        stamina = PlayerPrefs.GetFloat("Stamina", maxStamina); // Charger la stamina
         Debug.Log("Player stats loaded.");
     }
 }

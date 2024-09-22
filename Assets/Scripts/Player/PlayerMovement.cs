@@ -6,38 +6,70 @@ public class PlayerMovement : MonoBehaviour
     public float walkSpeed = 5f;
     public float crouchSpeed = 2f;
     public float sprintSpeed = 10f;
+    public float swimSpeed = 3f;
     public float jumpForce = 10f;
-    public float doubleJumpForce = 8f;
-    public int maxJumps = 2;  // Permet le double saut
+    public int maxJumps = 2;
     public float movementSmoothing = 0.1f;
 
     private Vector2 movementInput;
     private Vector3 velocity = Vector3.zero;
-    private bool isGrounded;
+    private bool isGrounded, isSwimming, isJumping, isFalling;
     private int remainingJumps;
     private Rigidbody rb;
     private PlayerControls playerControls;
     private float currentSpeed;
     private bool crouchInput, sprintInput, jumpInput;
+    private bool movementPressed, runPressed;
 
-    public Transform cameraTransform; // Référence à la caméra pour les déplacements relatifs à la caméra
+    public Transform cameraTransform;
     public float normalHeight = 2f;
     public float crouchHeight = 1f;
     private CapsuleCollider capsuleCollider;
-    public Animator animator;  // Référence à l'Animator
+    public Animator animator;
 
     public Transform groundCheck;
     public float groundDistance = 0.4f;
     public LayerMask groundMask;
+    public LayerMask waterMask;
+
+    // Hash des animations
+    int isWalkingHash;
+    int isRunningHash;
+    int isJumpingHash;
+    int isFallingHash;
+    int isLandingHash;
+    int isCrouchingHash;
+    int isSwimmingHash;
 
     private void Awake()
     {
+        // Initialisation des contrôles
         playerControls = new PlayerControls();
-        playerControls.Player.Move.performed += ctx => movementInput = ctx.ReadValue<Vector2>();
-        playerControls.Player.Move.canceled += ctx => movementInput = Vector2.zero;
+        
+        playerControls.Player.Move.performed += ctx => 
+        {
+            movementInput = ctx.ReadValue<Vector2>();
+            movementPressed = movementInput.x != 0 || movementInput.y != 0;
+        };
+        
+        playerControls.Player.Move.canceled += ctx => {
+            movementInput = Vector2.zero;
+            movementPressed = false;  // Réinitialise lorsque les touches de mouvement sont relâchées
+        };
+
         playerControls.Player.Jump.performed += ctx => jumpInput = true;
         playerControls.Player.Crouch.performed += ctx => crouchInput = ctx.ReadValueAsButton();
-        playerControls.Player.Sprint.performed += ctx => sprintInput = ctx.ReadValueAsButton();
+        playerControls.Player.Sprint.performed += ctx => runPressed = ctx.ReadValueAsButton();
+        playerControls.Player.Sprint.canceled += ctx => runPressed = false;
+
+        // Hash des animations
+        isWalkingHash = Animator.StringToHash("isWalking");
+        isRunningHash = Animator.StringToHash("isRunning");
+        isJumpingHash = Animator.StringToHash("isJumping");
+        isFallingHash = Animator.StringToHash("isFalling");
+        isLandingHash = Animator.StringToHash("isLanding");
+        isCrouchingHash = Animator.StringToHash("isCrouching");
+        isSwimmingHash = Animator.StringToHash("isSwimming");
     }
 
     private void OnEnable()
@@ -53,7 +85,7 @@ public class PlayerMovement : MonoBehaviour
     private void Start()
     {
         rb = GetComponent<Rigidbody>();
-        rb.freezeRotation = true;  // Empêche la rotation causée par la physique
+        rb.freezeRotation = true;
         capsuleCollider = GetComponent<CapsuleCollider>();
         currentSpeed = walkSpeed;
         remainingJumps = maxJumps;
@@ -61,14 +93,25 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        HandleMovement();
         CheckGroundStatus();
+        CheckSwimmingStatus();
 
-        if (jumpInput)
+        if (isSwimming)
+        {
+            HandleSwimming();
+        }
+        else
+        {
+            HandleMovement();
+        }
+
+        if (jumpInput && !isSwimming)
         {
             HandleJump();
-            jumpInput = false;  // Réinitialiser après le saut
+            jumpInput = false;
         }
+
+        HandleJumpAndFall();
     }
 
     private void HandleMovement()
@@ -84,25 +127,33 @@ public class PlayerMovement : MonoBehaviour
         Vector3 targetVelocity = new Vector3(direction.x * currentSpeed, rb.velocity.y, direction.z * currentSpeed);
         rb.velocity = Vector3.SmoothDamp(rb.velocity, targetVelocity, ref velocity, movementSmoothing);
 
-        // Gestion des animations de shuffle (gauche/droite)
-        if (animator != null)
-        {
-            if (movementInput.x < 0)  // Déplacement à gauche
-            {
-                animator.SetBool("isShufflingLeft", true);
-                animator.SetBool("isShufflingRight", false);
-            }
-            else if (movementInput.x > 0)  // Déplacement à droite
-            {
-                animator.SetBool("isShufflingLeft", false);
-                animator.SetBool("isShufflingRight", true);
-            }
-            else  // Pas de shuffle
-            {
-                animator.SetBool("isShufflingLeft", false);
-                animator.SetBool("isShufflingRight", false);
-            }
-        }
+        // Activer les animations pour la marche ou la course
+        UpdateAnimations();
+    }
+
+    private void HandleSwimming()
+    {
+        Vector3 direction = GetMovementDirection();
+        Vector3 targetVelocity = new Vector3(direction.x * swimSpeed, direction.y * swimSpeed, direction.z * swimSpeed);
+        rb.velocity = Vector3.SmoothDamp(rb.velocity, targetVelocity, ref velocity, movementSmoothing);
+
+        // Activer l'animation de natation
+        animator.SetBool(isSwimmingHash, true);
+        animator.SetBool(isWalkingHash, false);  // Désactiver la marche pendant la nage
+        animator.SetBool(isRunningHash, false);  // Désactiver la course pendant la nage
+    }
+
+    private void UpdateAnimations()
+    {
+        bool isWalking = movementPressed && !runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isRunning = movementPressed && runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isIdle = !movementPressed && !isJumping && !isFalling;
+        bool isCrouching = crouchInput;
+
+        animator.SetBool(isWalkingHash, isWalking);
+        animator.SetBool(isRunningHash, isRunning);
+        animator.SetBool("isIdle", isIdle);
+        animator.SetBool(isCrouchingHash, isCrouching);
     }
 
     private Vector3 GetMovementDirection()
@@ -126,7 +177,7 @@ public class PlayerMovement : MonoBehaviour
             currentSpeed = crouchSpeed;
             HandleCrouch();
         }
-        else if (sprintInput && !crouchInput)  // Sprint désactivé si accroupi
+        else if (runPressed && !crouchInput)
         {
             currentSpeed = sprintSpeed;
         }
@@ -138,16 +189,9 @@ public class PlayerMovement : MonoBehaviour
 
     private void HandleCrouch()
     {
-        if (crouchInput)
-        {
-            capsuleCollider.height = Mathf.Lerp(capsuleCollider.height, crouchHeight, Time.deltaTime * 10f);
-            cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, new Vector3(0, crouchHeight, 0), Time.deltaTime * 10f); // Ajustement caméra
-        }
-        else
-        {
-            capsuleCollider.height = Mathf.Lerp(capsuleCollider.height, normalHeight, Time.deltaTime * 10f);
-            cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, new Vector3(0, normalHeight, 0), Time.deltaTime * 10f); // Réinitialisation de la caméra
-        }
+        capsuleCollider.height = crouchInput
+            ? Mathf.Lerp(capsuleCollider.height, crouchHeight, Time.deltaTime * 10f)
+            : Mathf.Lerp(capsuleCollider.height, normalHeight, Time.deltaTime * 10f);
     }
 
     private void CheckGroundStatus()
@@ -156,52 +200,57 @@ public class PlayerMovement : MonoBehaviour
 
         if (isGrounded)
         {
-            remainingJumps = maxJumps;  // Réinitialiser les sauts lorsqu'au sol
+            remainingJumps = maxJumps;
         }
+    }
+
+    private void CheckSwimmingStatus()
+    {
+        isSwimming = Physics.CheckSphere(groundCheck.position, groundDistance, waterMask);
+
+        rb.useGravity = !isSwimming;
     }
 
     private void HandleJump()
     {
         if (isGrounded || remainingJumps > 0)
         {
-            if (isGrounded)
-            {
-                rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);  // Réinitialisation verticale avant le saut
-                rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-            }
-            else if (remainingJumps > 0)
-            {
-                rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);  // Réinitialisation pour double saut
-                rb.AddForce(Vector3.up * doubleJumpForce, ForceMode.Impulse);
-            }
+            rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
 
             remainingJumps--;
-            jumpInput = false;
+            isJumping = true;
+            animator.SetBool(isJumpingHash, true);
         }
     }
 
-    public void InteractWithObject(string interactionType)
+    private void HandleJumpAndFall()
     {
-        if (animator != null)
+        float verticalVelocity = rb.velocity.y;
+
+        if (verticalVelocity < 0 && !isGrounded && !isFalling)
         {
-            switch (interactionType)
-            {
-                case "Loot":
-                    animator.SetTrigger("Loot");
-                    break;
-                case "OpeningStart":
-                    animator.SetTrigger("OpeningStart");
-                    break;
-                case "OpeningEnd":
-                    animator.SetTrigger("OpeningEnd");
-                    break;
-            }
+            isJumping = false;
+            isFalling = true;
+            animator.SetBool(isFallingHash, true);
+            animator.SetBool(isJumpingHash, false);
+        }
+
+        if (isGrounded && isFalling)
+        {
+            isFalling = false;
+            animator.SetBool(isFallingHash, false);
+            animator.SetTrigger(isLandingHash);
         }
     }
 
-    private void OnDrawGizmosSelected()
+    private void OnCollisionEnter(Collision collision)
     {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(groundCheck.position, groundDistance);
+        if (collision.gameObject.CompareTag("Ground"))
+        {
+            isJumping = false;
+            animator.SetBool(isJumpingHash, false);
+            animator.SetBool(isLandingHash, true);
+        }
     }
 }

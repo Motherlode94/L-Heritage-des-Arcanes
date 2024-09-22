@@ -13,11 +13,15 @@ public class InventoryItem
 public class Inventory : MonoBehaviour
 {
     public List<InventoryItem> inventory = new List<InventoryItem>();
-    private InventoryUI inventoryUI;
+    public InventoryUI inventoryUI; // Assigner cette référence dans l'Inspector
 
     void Start()
     {
-        inventoryUI = GameObject.Find("InventoryUI").GetComponent<InventoryUI>();
+        // Vérification que inventoryUI est assigné
+        if (inventoryUI == null)
+        {
+            Debug.LogError("InventoryUI n'est pas assigné dans l'inspector.");
+        }
     }
 
     void OnTriggerEnter(Collider other)
@@ -41,6 +45,15 @@ public class Inventory : MonoBehaviour
             inventory.Add(item); // Ajouter un nouvel objet
         }
         Debug.Log(item.itemName + " ajouté à l'inventaire !");
-        inventoryUI.UpdateInventoryUI();
+
+        // Vérification avant d'utiliser inventoryUI
+        if (inventoryUI != null)
+        {
+            inventoryUI.UpdateInventoryUI();
+        }
+        else
+        {
+            Debug.LogWarning("InventoryUI est nul, l'UI ne sera pas mise à jour.");
+        }
     }
 }

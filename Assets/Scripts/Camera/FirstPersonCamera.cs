@@ -1,15 +1,11 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class FirstPersonCamera : MonoBehaviour
 {
-    public Transform player;  // Référence au joueur
+    public Transform player;
     public float mouseSensitivity = 100f;
-    public Transform playerBody;  // Le corps du joueur pour tourner
+    public Transform playerBody;
 
     private float xRotation = 0f;
     private PlayerControls playerControls;
@@ -33,17 +29,17 @@ public class FirstPersonCamera : MonoBehaviour
 
     private void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked;  // Verrouiller le curseur
-    }
-
-    private void OnLook(InputAction.CallbackContext context)
-    {
-        lookInput = context.ReadValue<Vector2>();
+        Cursor.lockState = CursorLockMode.Locked;
     }
 
     private void Update()
     {
         HandleMouseLook();
+    }
+
+    public void OnLook(InputAction.CallbackContext context)
+    {
+        lookInput = context.ReadValue<Vector2>();
     }
 
     private void HandleMouseLook()
@@ -52,9 +48,9 @@ public class FirstPersonCamera : MonoBehaviour
         float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
 
         xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limiter la rotation verticale
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limit vertical rotation
 
-        transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);  // Rotation verticale
-        playerBody.Rotate(Vector3.up * mouseX);  // Rotation horizontale avec le corps
+        transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        playerBody.Rotate(Vector3.up * mouseX);
     }
 }

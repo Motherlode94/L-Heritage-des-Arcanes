@@ -7,8 +7,7 @@ public class CameraSwitcher : MonoBehaviour
     public Camera firstPersonCamera;
     public Camera thirdPersonCamera;
     public Camera topDownCamera;
-
-    public float transitionDuration = 1.5f;  
+    public float transitionDuration = 1.5f;
     public AnimationCurve transitionCurve;
 
     private PlayerControls playerControls;
@@ -31,7 +30,7 @@ public class CameraSwitcher : MonoBehaviour
 
     private void Start()
     {
-        SetThirdPersonView();  // Démarrer en vue troisième personne
+        SetThirdPersonView();  // Start with third-person view
     }
 
     private void OnSwitchCameraView(InputAction.CallbackContext context)
@@ -67,8 +66,7 @@ public class CameraSwitcher : MonoBehaviour
         while (elapsedTime < duration)
         {
             elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-            t = transitionCurve.Evaluate(t);
+            float t = transitionCurve.Evaluate(elapsedTime / duration);
 
             toCamera.transform.position = Vector3.Lerp(startPosition, endPosition, t);
             toCamera.transform.rotation = Quaternion.Slerp(startRotation, endRotation, t);

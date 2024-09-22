@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections.Generic;
 
 public class InventoryUI : MonoBehaviour
 {
@@ -8,26 +9,55 @@ public class InventoryUI : MonoBehaviour
     public GameObject itemSlotPrefab; // Préfab pour afficher un slot d'item
 
     private Inventory inventory;
+    private List<GameObject> activeSlots = new List<GameObject>(); // To reuse slots instead of destroying
 
     void Start()
     {
         // Obtenir le script Inventory du joueur
-        inventory = GameObject.FindGameObjectWithTag("Player").GetComponent<Inventory>();
-        UpdateInventoryUI();
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            inventory = player.GetComponent<Inventory>();
+            if (inventory != null)
+            {
+                UpdateInventoryUI();
+            }
+            else
+            {
+                Debug.LogError("Inventory script not found on Player!");
+            }
+        }
+        else
+        {
+            Debug.LogError("Player not found!");
+        }
     }
 
     public void UpdateInventoryUI()
     {
-        // Nettoyer les anciens slots
-        foreach (Transform child in itemSlotContainer)
+        // Désactiver les anciens slots plutôt que les détruire
+        foreach (GameObject slot in activeSlots)
         {
-            Destroy(child.gameObject);
+            slot.SetActive(false);
         }
 
-        // Ajouter les objets de l'inventaire à l'UI
-        foreach (InventoryItem item in inventory.inventory)
+        // Créer ou réactiver des slots pour chaque objet dans l'inventaire
+        for (int i = 0; i < inventory.inventory.Count; i++)
         {
-            GameObject itemSlot = Instantiate(itemSlotPrefab, itemSlotContainer);
+            GameObject itemSlot;
+            if (i < activeSlots.Count)
+            {
+                itemSlot = activeSlots[i];
+                itemSlot.SetActive(true); // Réactiver un ancien slot
+            }
+            else
+            {
+                itemSlot = Instantiate(itemSlotPrefab, itemSlotContainer); // Créer un nouveau slot
+                activeSlots.Add(itemSlot);
+            }
+
+            // Mettre à jour les infos de l'item dans le slot
+            InventoryItem item = inventory.inventory[i];
             itemSlot.GetComponentInChildren<Text>().text = item.itemName; // Afficher le nom de l'item
         }
     }

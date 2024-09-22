@@ -7,18 +7,14 @@ public class PlayerAnimation : MonoBehaviour
     public Transform playerBody;
     public Transform playerCamera;
 
-    private bool isIdle = true;
-    private bool isWalkingFW = false;
-    private bool isWalkingBW = false;
     private bool isCrouching = false;
-    private bool isSprinting = false;
     private bool isJumping = false;
-    private bool isFalling = false;
-    private bool isLanding = false;
+    private bool isSwimming = false;  // Ajout du contrôle de natation
 
     public float walkSpeed = 2f;
     public float crouchSpeed = 1.5f;
     public float sprintSpeed = 5f;
+    public float swimSpeed = 3f;  // Vitesse de natation
     public float mouseSensitivity = 100f;
     public float rotationSmoothTime = 0.1f;
     private float xRotation = 0f;
@@ -61,69 +57,44 @@ public class PlayerAnimation : MonoBehaviour
     {
         HandleMovement();
         HandleMouseLook();
-        HandleAnimations();
         HandleCrouch();
         AlignBodyToCamera();
+        UpdateAnimationParameters();  // Mise à jour des paramètres du Blend Tree
     }
 
     void HandleMovement()
     {
         Vector3 move = transform.right * movementInput.x + transform.forward * movementInput.y;
 
-        if (sprintInput && movementInput.y > 0 && !isCrouching)
+        if (isSwimming)
         {
-            isSprinting = true;
-            characterController.Move(move * sprintSpeed * Time.deltaTime);
-        }
-        else if (isCrouching)
-        {
-            if (movementInput.magnitude > 0)
-            {
-                animator.SetBool("CrouchMoving", true);  // Utiliser le blend tree pour les mouvements accroupis
-            }
-            characterController.Move(move * crouchSpeed * Time.deltaTime);
+            HandleSwimming(move);
         }
         else
         {
-            isSprinting = false;
-            characterController.Move(move * walkSpeed * Time.deltaTime);
+            HandleGroundMovement(move);
         }
-
-        isWalkingFW = (movementInput.y > 0);
-        isWalkingBW = (movementInput.y < 0);
-
-        HandleJumpAndFall();
     }
 
-    void HandleJumpAndFall()
+    void HandleGroundMovement(Vector3 move)
     {
-        // Gestion du saut, de la chute, et de l'atterrissage
-        if (jumpInput && characterController.isGrounded && !isJumping)
-        {
-            isJumping = true;
-            isFalling = false;
-            isLanding = false;
+        float currentSpeed = walkSpeed;
 
-            animator.SetBool("isJumping", true);
-            animator.SetBool("isFalling", false);
-            animator.ResetTrigger("isLanding");
-
-            jumpInput = false;
-        }
-        else if (!characterController.isGrounded && !isJumping)
+        if (sprintInput && movementInput.y > 0 && !isCrouching)
         {
-            isFalling = true;
-            animator.SetBool("isFalling", true);
-            animator.SetBool("isJumping", false);
+            currentSpeed = sprintSpeed;
         }
-        else if (characterController.isGrounded && isFalling)
+        else if (isCrouching)
         {
-            isFalling = false;
-            isLanding = true;
-
-            animator.SetTrigger("isLanding");  // Déclencher l'animation d'atterrissage
-            animator.SetBool("isFalling", false);
+            currentSpeed = crouchSpeed;
         }
+
+        characterController.Move(move * currentSpeed * Time.deltaTime);
+    }
+
+    void HandleSwimming(Vector3 move)
+    {
+        characterController.Move(move * swimSpeed * Time.deltaTime);
     }
 
     void HandleMouseLook()
@@ -140,7 +111,6 @@ public class PlayerAnimation : MonoBehaviour
 
     void AlignBodyToCamera()
     {
-        // On ne tourne que le corps, pas la caméra
         Vector3 cameraForward = playerCamera.forward;
         cameraForward.y = 0;  // Éviter que le joueur se penche ou se lève
 
@@ -148,54 +118,43 @@ public class PlayerAnimation : MonoBehaviour
         playerBody.rotation = Quaternion.Slerp(playerBody.rotation, targetRotation, Time.deltaTime * rotationSmoothTime);
     }
 
-    void HandleAnimations()
-    {
-        // Gestion des animations accroupies via blend tree
-        if (isCrouching)
-        {
-            animator.SetFloat("Horizontal", movementInput.x);
-            animator.SetFloat("Vertical", movementInput.y);
-
-            if (movementInput == Vector2.zero)
-            {
-                animator.Play("CrouchIdle");
-            }
-            else
-            {
-                animator.SetBool("CrouchMoving", true);  // Le BlendTree gère les mouvements
-            }
-        }
-        else
-        {
-            // Gestion des animations classiques
-            isIdle = movementInput == Vector2.zero && !isSprinting && !isJumping && !isFalling && !isLanding;
-            animator.SetBool("Idle", isIdle);
-            animator.SetBool("WalkFW", isWalkingFW);
-            animator.SetBool("WalkBW", isWalkingBW);
-            animator.SetBool("Sprint", isSprinting);
-        }
-    }
-
     void HandleCrouch()
     {
-        if (crouchInput && !isCrouching)
+        if (crouchInput && !isCrouching && !isSwimming) // Pas d'accroupissement en natation
         {
             isCrouching = true;
-            animator.Play("CrouchStart");  // Animation de début d'accroupissement
-            Invoke(nameof(StartCrouchIdle), animator.GetCurrentAnimatorStateInfo(0).length);  // Passer à l'Idle accroupi après l'animation de début
+            animator.SetBool("isCrouching", true);
         }
         else if (!crouchInput && isCrouching)
         {
             isCrouching = false;
-            animator.Play("CrouchEnd");  // Animation de fin d'accroupissement
+            animator.SetBool("isCrouching", false);
         }
     }
 
-    void StartCrouchIdle()
+    void UpdateAnimationParameters()
     {
-        if (isCrouching)
+        // Mise à jour des paramètres Horizontal et Vertical pour les Blend Trees
+        animator.SetFloat("Horizontal", movementInput.x);
+        animator.SetFloat("Vertical", movementInput.y);
+        animator.SetBool("isSwimming", isSwimming);  // Activer ou désactiver le Blend Tree de natation
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Water"))
         {
-            animator.Play("CrouchIdle");  // Jouer l'animation Idle après le Start
+            isSwimming = true;
+            characterController.enabled = false;  // Désactiver le contrôleur de personnage pour le mouvement de natation
+        }
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Water"))
+        {
+            isSwimming = false;
+            characterController.enabled = true;  // Réactiver le contrôleur de personnage quand on sort de l'eau
         }
     }
 }
