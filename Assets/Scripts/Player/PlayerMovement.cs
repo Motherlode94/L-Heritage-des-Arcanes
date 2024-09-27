@@ -20,6 +20,7 @@ public class PlayerMovement : MonoBehaviour
     public float dodgeStaminaCost = 15f;
     public float attackStaminaCost = 20f;
     public float movementSmoothing = 0.1f;
+    public float gravityMultiplier = 2f; // For faster falling
 
     private Vector2 movementInput;
     private Vector3 velocity = Vector3.zero;
@@ -82,13 +83,25 @@ public class PlayerMovement : MonoBehaviour
         capsuleCollider = GetComponent<CapsuleCollider>();
         currentSpeed = walkSpeed;
         remainingJumps = maxJumps;
+        rb.interpolation = RigidbodyInterpolation.Interpolate; // Smoother physics
+    }
+
+    private void Update()
+    {
+        // Cache input in Update() for better performance
+        movementInput = playerControls.Player.Move.ReadValue<Vector2>();
+        jumpInput = playerControls.Player.Jump.triggered;
+        crouchInput = playerControls.Player.Crouch.IsPressed();
+        sprintInput = playerControls.Player.Sprint.IsPressed();
+        attackInput = playerControls.Player.Attack.triggered;
+        dodgeInput = playerControls.Player.Dodge.triggered;
     }
 
     private void FixedUpdate()
     {
         HandleStamina();
         CheckGroundStatus();
-        CheckSwimmingStatus();  // Ensuring this is called properly
+        CheckSwimmingStatus();
 
         if (isSwimming)
         {
@@ -197,7 +210,7 @@ public class PlayerMovement : MonoBehaviour
         {
             stamina -= sprintStaminaCost * Time.deltaTime;
         }
-        else
+        else if (!isDodging && !isAttacking)
         {
             stamina += staminaRegenRate * Time.deltaTime;
             stamina = Mathf.Clamp(stamina, 0, 100f);
@@ -213,65 +226,61 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void ApplyGravity()
+    {
+        if (!isGrounded)
+        {
+            rb.AddForce(Vector3.down * gravityMultiplier, ForceMode.Acceleration);
+        }
+    }
+
     private void HandleJumpAndFall()
     {
-            // Get the vertical velocity of the player (y-axis)
-    float verticalVelocity = rb.velocity.y;
+        // Get the vertical velocity of the player (y-axis)
+        float verticalVelocity = rb.velocity.y;
 
-    // Check if the player is falling (negative vertical velocity and not grounded)
-    if (verticalVelocity < 0 && !isGrounded && !isFalling)
-    {
-        // Player starts falling
-        isJumping = false;
-        isFalling = true;
-        animator.SetBool("isFalling", true);
-        animator.SetBool("isJumping", false);
-    }
+        // Check if the player is falling (negative vertical velocity and not grounded)
+        if (verticalVelocity < 0 && !isGrounded && !isFalling)
+        {
+            // Player starts falling
+            isJumping = false;
+            isFalling = true;
+            animator.SetBool("isFalling", true);
+            animator.SetBool("isJumping", false);
+        }
 
-    // Check if the player has landed
-    if (isGrounded && isFalling)
-    {
-        // Player has landed
-        isFalling = false;
-        animator.SetBool("isFalling", false);
-        animator.SetTrigger("isLanding");  // Use a trigger for landing animation
-    }
+        // Check if the player has landed
+        if (isGrounded && isFalling)
+        {
+            // Player has landed
+            isFalling = false;
+            animator.SetBool("isFalling", false);
+            animator.SetTrigger("isLanding");  // Use a trigger for landing animation
+        }
     }
 
     private void UpdateAnimations()
     {
-            // Check if the player is walking forward (y > 0) and is not running, jumping, or falling
-    bool isWalkingForward = movementInput.y > 0 && !runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isWalkingForward = movementInput.y > 0 && !runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isWalkingBackward = movementInput.y < 0 && !runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isRunning = movementInput.y > 0 && runPressed && !crouchInput && !isJumping && !isFalling;
+        bool isIdle = movementInput == Vector2.zero && !isJumping && !isFalling;
 
-    // Check if the player is walking backward (y < 0) and is not running, jumping, or falling
-    bool isWalkingBackward = movementInput.y < 0 && !runPressed && !crouchInput && !isJumping && !isFalling;
+        animator.SetBool("isWalkingForward", isWalkingForward);
+        animator.SetBool("isWalkingBackward", isWalkingBackward);
+        animator.SetBool("isRunning", isRunning);
+        animator.SetBool("isIdle", isIdle);
 
-    // Check if the player is running (y > 0 and run is pressed) and is not crouching, jumping, or falling
-    bool isRunning = movementInput.y > 0 && runPressed && !crouchInput && !isJumping && !isFalling;
+        animator.SetBool("isCrouching", crouchInput);
 
-    // Check if the player is idle (no movement and not jumping or falling)
-    bool isIdle = movementInput == Vector2.zero && !isJumping && !isFalling;
-
-    // Set animator parameters based on player state
-    animator.SetBool("isWalkingForward", isWalkingForward);
-    animator.SetBool("isWalkingBackward", isWalkingBackward);
-    animator.SetBool("isRunning", isRunning);
-    animator.SetBool("isIdle", isIdle);
-
-    // Set crouching animation
-    animator.SetBool("isCrouching", crouchInput);
-
-    // Swimming is already handled separately in the swimming logic
-    if (isSwimming)
-    {
-        animator.SetBool("isSwimming", true);
-    }
-    else
-    {
-        animator.SetBool("isSwimming", false);
-    }
-
-    // Handle jumping and falling animations in HandleJumpAndFall
+        if (isSwimming)
+        {
+            animator.SetBool("isSwimming", true);
+        }
+        else
+        {
+            animator.SetBool("isSwimming", false);
+        }
     }
 
     private Vector3 GetMovementDirection()
@@ -306,14 +315,17 @@ public class PlayerMovement : MonoBehaviour
         Vector3 targetVelocity = new Vector3(direction.x * swimSpeed, direction.y * swimSpeed, direction.z * swimSpeed);
         rb.velocity = Vector3.SmoothDamp(rb.velocity, targetVelocity, ref velocity, movementSmoothing);
         
-        // Update swimming animations
         animator.SetBool("isSwimming", true);
+    }
+
+    private bool CanStandUp()
+    {
+        return !Physics.CheckCapsule(transform.position, transform.position + Vector3.up * normalHeight, capsuleCollider.radius, groundMask);
     }
 
     private void Zoom(float scrollAmount)
     {
-        currentZoom -= scrollAmount * zoomSpeed;
-        currentZoom = Mathf.Clamp(currentZoom, minZoom, maxZoom);
-        cameraTransform.localPosition = new Vector3(cameraTransform.localPosition.x, cameraTransform.localPosition.y, -currentZoom);
+        Camera.main.fieldOfView -= scrollAmount * zoomSpeed;
+        Camera.main.fieldOfView = Mathf.Clamp(Camera.main.fieldOfView, minZoom, maxZoom);
     }
 }

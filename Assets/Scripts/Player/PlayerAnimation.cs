@@ -7,7 +7,6 @@ public class PlayerAnimation : MonoBehaviour
     public Transform playerBody;
     public Transform playerCamera;
 
-    // Énumération des différents états
     private enum PlayerState { Idle, Walking, Running, Crouching, Swimming, Jumping }
     private PlayerState currentState;
 
@@ -121,10 +120,13 @@ public class PlayerAnimation : MonoBehaviour
                 animator.SetBool("isWalking", false);
                 animator.SetBool("isRunning", false);
                 animator.SetBool("isCrouching", false);
+                animator.SetBool("isSwimming", false);
+                animator.SetBool("isJumping", false);
                 break;
             case PlayerState.Walking:
                 animator.SetBool("isWalking", true);
                 animator.SetBool("isIdle", false);
+                animator.SetBool("isRunning", false);
                 break;
             case PlayerState.Running:
                 animator.SetBool("isRunning", true);
@@ -191,7 +193,6 @@ public class PlayerAnimation : MonoBehaviour
         if (other.CompareTag("Water"))
         {
             isSwimming = true;
-            characterController.Move(Vector3.zero);
         }
     }
 
