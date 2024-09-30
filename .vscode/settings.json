@@ -51,5 +51,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "L'Héritage des Arcanes.sln"
+    "dotnet.defaultSolution": "L-Heritage-des-Arcanes.sln"
 }
